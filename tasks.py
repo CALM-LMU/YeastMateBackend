@@ -2,6 +2,10 @@ from glob import glob
 import requests
 from skimage.io import imread, imsave
 
+import base64
+from io import BytesIO
+from PIL import Image
+
 from app import huey
 
 from alignment import *
@@ -38,7 +42,7 @@ def align_task(in_dir, out_dir, detection, mask, alignment, video_split, channel
     return 'Success'
 
 @huey.task()
-def detect_task(in_dir, out_dir, mask, cfg, weights, video_split, boxsize, channels, video):
+def detect_task(in_dir, out_dir, mask, zproject, video_split, boxsize, channels, video):
     channel_order = get_detection_mask_channel_vars(channels)
 
     files_to_process = glob(os.path.join(in_dir, "*.tif"))
@@ -46,16 +50,31 @@ def detect_task(in_dir, out_dir, mask, cfg, weights, video_split, boxsize, chann
     for i, path in enumerate(files_to_process):
         image = imread(path)
 
-         if video:
+        if video:
             image = image[-1]
-        
+
+        if zproject:
+            image = np.max(image, axis=0)
+        if len(image.shape) < 3:
+            image = np.expand_dims(image, axis=-1)
+            image = np.repeat(image, 3, axis=-1)
+        elif image.shape[-1] == 1:
+            image = np.repeat(image, 3, axis=-1)
+
+        if channel_order != [0,1,2]:
+        stack = []
+        for ch in channel_order:
+            stack.append(image[ch])
+        image = np.asarray(stack)
+     
         image = Image.fromarray(image)
         
-        buffered = BytesIO()
-        image.save(buffered, format="TIFF")
-        image_str = base64.b64encode(buffered.getvalue()).decode('UTF-8')
+        imagebytes = BytesIO()
+        image.save(imagebytes, format="PNG")
+        imagebytes.seek(0)
+        imagedict = {"image": ('image.png', imagebytes, 'image/png')}
 
-        result = requests.post("http://127.0.0.1:8001/predict", json=[image_str])
+        result = requests.post("http://127.0.0.1:8001/predict_box", files=imagedict)
 
         mating_boxes = []
         boxes = result['boxes']
@@ -78,13 +97,12 @@ def detect_task(in_dir, out_dir, mask, cfg, weights, video_split, boxsize, chann
 
         crop_img(image, mating_boxes, name)
 
-
     if mask:
         mask_task(ARGS)
     
 
 @huey.task()
-def mask_task(in_dir, out_dir, cfg, weights, channels):
+def mask_task(in_dir, out_dir, zproject, channels):
     channel_order = get_detection_mask_channel_vars(channels)
 
     files_to_process = glob(os.path.join(in_dir, "*.tif"))
@@ -92,16 +110,31 @@ def mask_task(in_dir, out_dir, cfg, weights, channels):
     for i, path in enumerate(files_to_process):
         image = imread(path)
 
-         if video:
+        if video:
             image = image[-1]
+
+        if zproject:
+            image = np.max(image, axis=0)
+        if len(image.shape) < 3:
+            image = np.expand_dims(image, axis=-1)
+            image = np.repeat(image, 3, axis=-1)
+        elif image.shape[-1] == 1:
+            image = np.repeat(image, 3, axis=-1)
+
+        if channel_order != [0,1,2]:
+        stack = []
+        for ch in channel_order:
+            stack.append(image[ch])
+        image = np.asarray(stack)
         
         image = Image.fromarray(image)
         
-        buffered = BytesIO()
-        image.save(buffered, format="TIFF")
-        image_str = base64.b64encode(buffered.getvalue()).decode('UTF-8')
+        imagebytes = BytesIO()
+        image.save(imagebytes, format="PNG")
+        imagebytes.seek(0)
+        imagedict = {"image": ('image.png', imagebytes, 'image/png')}
 
-        response = requests.post("http://127.0.0.1:8002/predict", json=[image_str])
+        response = requests.post("http://127.0.0.1:8001/predict_mask", files=imagedict)
 
         mating_boxes = []
         seg = result['pans'][0]
