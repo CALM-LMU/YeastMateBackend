@@ -14,6 +14,11 @@ from utils import *
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
+@huey.signal()
+def all_signal_handler(signal, task, exc=None):
+    # This handler will be called for every signal.
+    print('%s - %s' % (signal, task.id))
+
 @huey.task()
 def align_task(in_dir, out_dir, detection, mask, alignment, video_split, channels, file_format, dimensions, series_suffix='_series{}'):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
@@ -62,10 +67,10 @@ def detect_task(in_dir, out_dir, mask, zproject, video_split, boxsize, channels,
             image = np.repeat(image, 3, axis=-1)
 
         if channel_order != [0,1,2]:
-        stack = []
-        for ch in channel_order:
-            stack.append(image[ch])
-        image = np.asarray(stack)
+            stack = []
+            for ch in channel_order:
+                stack.append(image[ch])
+            image = np.asarray(stack)
      
         image = Image.fromarray(image)
         
@@ -122,10 +127,10 @@ def mask_task(in_dir, out_dir, zproject, channels):
             image = np.repeat(image, 3, axis=-1)
 
         if channel_order != [0,1,2]:
-        stack = []
-        for ch in channel_order:
-            stack.append(image[ch])
-        image = np.asarray(stack)
+            stack = []
+            for ch in channel_order:
+                stack.append(image[ch])
+            image = np.asarray(stack)
         
         image = Image.fromarray(image)
         
