@@ -1,4 +1,6 @@
 import os
+import copy
+import json
 
 from flask import render_template
 from flask import request, jsonify
@@ -6,13 +8,35 @@ from flask import request, jsonify
 from app import app
 from tasks import align_task, detect_task, mask_task
 
+from app import huey
+
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
+
+@huey.pre_execute()
+def add_execute_task(task):
+    global executing_tasks
+
+    if task.name == 'align_task':
+        job = 'Alignment'
+    elif task.name == 'detect_task':
+        job = 'Detection'
+    elif task.name == 'mask_task':
+        job = 'Masking'
+
+    tasks = json.loads(huey.storage.peek_data('tasks'))
+    tasks[task.id] = {'Job': job, 'Path': task.args[0], 'Status': 'Running'}
+    huey.storage.put_data('tasks', json.dumps(tasks).encode('utf-8'))
+
+@huey.post_execute()
+def remove_execute_task(task, task_value, exc):
+    tasks = json.loads(huey.storage.peek_data('tasks'))
+    del tasks[task.id]
+    huey.storage.put_data('tasks', json.dumps(tasks).encode('utf-8'))
+
 @app.route('/', methods=['POST'])
 def queue_job():
-    logging.info(request.json)
-
     detect = False
     mask = False
     if 'detect' in request.json.keys():
@@ -59,5 +83,18 @@ def queue_job():
     return 'Queued, success'
 
 @app.route('/', methods=['GET'])
-def get_progress():
-    pass
+def get_tasklist():
+    tasklist = list(json.loads(huey.storage.peek_data('tasks')).values())
+
+    tasks = huey.pending()
+    for t in tasks:
+        if t.name == 'align_task':
+            job = 'Alignment'
+        elif t.name == 'detect_task':
+            job = 'Detection'
+        elif t.name == 'mask_task':
+            job = 'Masking'
+
+        tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+
+    return jsonify({'tasks' : tasklist})
