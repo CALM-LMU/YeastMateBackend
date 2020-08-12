@@ -1,5 +1,6 @@
-from glob import glob
+import os
 import requests
+from glob import glob
 from skimage.io import imread, imsave
 
 import base64
@@ -14,22 +15,24 @@ from utils import *
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-@huey.signal()
-def all_signal_handler(signal, task, exc=None):
-    # This handler will be called for every signal.
-    print('%s - %s' % (signal, task.id))
+@huey.task()
+def start_pipeline(align, detect, mask, path):
+    return
 
 @huey.task()
-def align_task(in_dir, out_dir, detection, mask, alignment, video_split, channels, file_format, dimensions, series_suffix='_series{}'):
+def align_task(path, detect, mask, alignment, video_split, channels, file_format, dimensions, series_suffix='_series{}'):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
     tif_channels = get_align_dimension_vars(dimensions)
+
+    in_dir = path
+    out_dir = os.path.join(in_dir, 'aligned')
     
     # get all input files
     if file_format == '.nd2':
         files_to_process = glob(os.path.join(in_dir, "*.nd2"))
     else:
         files_to_process = glob(os.path.join(in_dir, "*.tif"))
-    
+
     # align and re-save all files
     for i, path in enumerate(files_to_process):
         process_single_file({'idx': i, 'total': len(files_to_process)}, os.path.join(in_dir, path), out_dir,
@@ -41,14 +44,16 @@ def align_task(in_dir, out_dir, detection, mask, alignment, video_split, channel
                 alignment_channel_cam1=alignment_channel_cam1, 
                 alignment_channel_cam2=alignment_channel_cam2)   
 
-    if detect:
-        detect_task(ARGS)   
-
-    return 'Success'
-
 @huey.task()
-def detect_task(in_dir, out_dir, mask, zproject, video_split, boxsize, channels, video):
+def detect_task(path, mask, zstack, video_split, boxsize, channels, video):
     channel_order = get_detection_mask_channel_vars(channels)
+
+    if os.path.isdir(os.path.join(path, 'aligned')):
+        in_dir = os.path.join(path, 'aligned')
+    else:
+        in_dir = path
+
+    out_dir = os.path.join(path, 'cropped')
 
     files_to_process = glob(os.path.join(in_dir, "*.tif"))
 
@@ -58,7 +63,7 @@ def detect_task(in_dir, out_dir, mask, zproject, video_split, boxsize, channels,
         if video:
             image = image[-1]
 
-        if zproject:
+        if zstack:
             image = np.max(image, axis=0)
         if len(image.shape) < 3:
             image = np.expand_dims(image, axis=-1)
@@ -79,7 +84,7 @@ def detect_task(in_dir, out_dir, mask, zproject, video_split, boxsize, channels,
         imagebytes.seek(0)
         imagedict = {"image": ('image.png', imagebytes, 'image/png')}
 
-        result = requests.post("http://127.0.0.1:8001/predict_box", files=imagedict)
+        result = requests.post("http://127.0.0.1:5005/predict_box", files=imagedict)
 
         mating_boxes = []
         boxes = result['boxes']
@@ -102,13 +107,16 @@ def detect_task(in_dir, out_dir, mask, zproject, video_split, boxsize, channels,
 
         crop_img(image, mating_boxes, name)
 
-    if mask:
-        mask_task(ARGS)
-    
-
 @huey.task()
-def mask_task(in_dir, out_dir, zproject, channels):
+def mask_task(path, zstack, channels):
     channel_order = get_detection_mask_channel_vars(channels)
+
+    if os.path.isdir(os.path.join(path, 'cropped')):
+        in_dir = os.path.join(path, 'cropped')
+    else:
+        in_dir = path
+
+    out_dir = os.path.join(path, 'masked')
 
     files_to_process = glob(os.path.join(in_dir, "*.tif"))
 
@@ -118,7 +126,7 @@ def mask_task(in_dir, out_dir, zproject, channels):
         if video:
             image = image[-1]
 
-        if zproject:
+        if zstack:
             image = np.max(image, axis=0)
         if len(image.shape) < 3:
             image = np.expand_dims(image, axis=-1)
@@ -139,7 +147,7 @@ def mask_task(in_dir, out_dir, zproject, channels):
         imagebytes.seek(0)
         imagedict = {"image": ('image.png', imagebytes, 'image/png')}
 
-        response = requests.post("http://127.0.0.1:8001/predict_mask", files=imagedict)
+        response = requests.post("http://127.0.0.1:5005/predict_mask", files=imagedict)
 
         mating_boxes = []
         seg = result['pans'][0]
@@ -184,4 +192,3 @@ def mask_task(in_dir, out_dir, zproject, channels):
         imsave(name+"_ATP6-NG.tif", atp)
         imsave(name+"_mtKate2.tif", kate)
         imsave(name+"_daughter.tif", daughter)
-

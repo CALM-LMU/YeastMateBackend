@@ -6,47 +6,78 @@ from flask import render_template
 from flask import request, jsonify
 
 from app import app
-from tasks import align_task, detect_task, mask_task
+from tasks import start_pipeline, align_task, detect_task, mask_task
 
 from app import huey
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-
 @huey.pre_execute()
 def add_execute_task(task):
     global executing_tasks
 
+    tasks = json.loads(huey.storage.peek_data('tasks'))
+
     if task.name == 'align_task':
-        job = 'Alignment'
+        tasks[task.id+'align'] = {'Job': 'Alignment', 'Path': task.args[0], 'Status': 'Running'}
+
+        if task.args[1]:
+            tasks[task.id+'detect'] = {'Job': 'Detection', 'Path': task.args[0], 'Status': 'Pending'}
+        if task.args[2]:
+            tasks[task.id+'mask'] = {'Job': 'Masking', 'Path': task.args[0], 'Status': 'Pending'}
+
     elif task.name == 'detect_task':
-        job = 'Detection'
+        tasks[task.id+'detect'] = {'Job': 'Detection', 'Path': task.args[0], 'Status': 'Running'}
+
+        if task.args[1]:
+            tasks[task.id+'mask'] = {'Job': 'Masking', 'Path': task.args[0], 'Status': 'Pending'}
+
     elif task.name == 'mask_task':
         job = 'Masking'
+        tasks[task.id+'mask'] = {'Job': 'Masking', 'Path': task.args[0], 'Status': 'Running'}
+    else:
+        return
 
-    tasks = json.loads(huey.storage.peek_data('tasks'))
-    tasks[task.id] = {'Job': job, 'Path': task.args[0], 'Status': 'Running'}
     huey.storage.put_data('tasks', json.dumps(tasks).encode('utf-8'))
 
 @huey.post_execute()
 def remove_execute_task(task, task_value, exc):
-    tasks = json.loads(huey.storage.peek_data('tasks'))
-    del tasks[task.id]
-    huey.storage.put_data('tasks', json.dumps(tasks).encode('utf-8'))
+    if task.name != 'start_pipeline':
+        tasks = json.loads(huey.storage.peek_data('tasks'))
+        try:
+            del tasks[task.id+'align']
+        except:
+            pass
+
+        try:
+            del tasks[task.id+'detect']
+        except:
+            pass
+
+        try:
+            del tasks[task.id+'mask']
+        except:
+            pass
+
+        huey.storage.put_data('tasks', json.dumps(tasks).encode('utf-8'))
 
 @app.route('/', methods=['POST'])
 def queue_job():
+    align = False
     detect = False
     mask = False
+    if 'align' in request.json.keys():
+        align = True
     if 'detect' in request.json.keys():
         detect = True
     if 'mask' in request.json.keys():
         mask = True
+
+    pipeline = start_pipeline.s(align, detect, mask, request.json['path'])
     
     if 'align' in request.json.keys():
-        in_dir = request.json['path']
-        out_dir = os.path.join(in_dir, 'aligned')
+        path = os.path.join(request.json['path'])
 
         alignment = request.json['align']['alignment']
         video_split = request.json['align']['videoSplit']
@@ -54,31 +85,28 @@ def queue_job():
         file_format = request.json['align']['inputFileFormat'] 
         dimensions = request.json['align']['dimensions']
 
-        task = align_task(in_dir, out_dir, detect, mask, alignment, video_split, channels, file_format, dimensions)
+        pipeline = pipeline.then(align_task, path, detect, mask, alignment, video_split, channels, file_format, dimensions)
 
-    elif detect:
-        if 'mask' in request.json.keys():
-            mask = True
-        else:
-            mask = False
+    if 'detect' in request.json.keys():
+        path = os.path.join(request.json['path'])
 
-        in_dir = os.path.join(request.json['path'], 'aligned')
-        out_dir = os.path.join(request.json['path'], 'cropped')
-        zproject = request.json['detect']['zproject']
+        zstack = request.json['detect']['zstack']
         video_split = request.json['detect']['videoSplit']
         boxsize = request.json['detect']['boxsize']
         channels = request.json['detect']['channels']
         video = request.json['detect']['video']
 
-        task = detect_task(in_dir, out_dir, mask, zproject, video_split, boxsize, channels, video)
+        pipeline = pipeline.then(detect_task, path, mask, zstack, video_split, boxsize, channels, video)
 
-    elif mask:
-        in_dir = os.path.join(request.json['path'], 'cropped')
-        out_dir = os.path.join(request.json['path'], 'masked')
-        zproject = request.json['detect']['zproject']
+    if 'mask' in request.json.keys():
+        path = os.path.join(request.json['path'])
+
+        zstack = request.json['detect']['zstack']
         channels = request.json['detect']['channels']
 
-        task = mask_task(in_dir, out_dir, zproject, channels)
+        pipeline = pipeline.then(mask_task, path, zstack, channels)
+
+    huey.enqueue(pipeline)
 
     return 'Queued, success'
 
@@ -88,13 +116,44 @@ def get_tasklist():
 
     tasks = huey.pending()
     for t in tasks:
-        if t.name == 'align_task':
+        if t.name == 'start_pipeline':
+            if t.args[0]:
+                job = 'Alignment'
+                tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
+            
+            if t.args[1]:
+                job = 'Detection'
+                tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
+
+                if t.args[2]:
+                    job = 'Masking'
+                    tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
+
+        elif t.name == 'align_task':
             job = 'Alignment'
+            tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+            
+            if t.args[1]:
+                job = 'Detection'
+                tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+
+                if t.args[2]:
+                    job = 'Masking'
+                    tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+
         elif t.name == 'detect_task':
             job = 'Detection'
+            tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+
+            if t.args[1]:
+                job = 'Masking'
+                tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+
         elif t.name == 'mask_task':
             job = 'Masking'
+            tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
 
-        tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+        else:
+            continue
 
     return jsonify({'tasks' : tasklist})
