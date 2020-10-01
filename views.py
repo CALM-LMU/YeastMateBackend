@@ -77,21 +77,10 @@ def queue_job():
         zstack = request.json['detect']['zstack']
         video_split = request.json['detect']['videoSplit']
         video = request.json['detect']['video']
-
-        try:
-            graychannel = request.json['detect']['graychannel']
-        except:
-            graychannel = 0
-        
-        try:
-            fiji = request.json['detect']['fiji']
-        except:
-            fiji = True
-
-        try:
-            ip = request.json['detect']['ip']
-        except:
-            ip = "10.153.168.3:5000"
+        graychannel = request.json['detect']['graychannel']
+        fiji = request.json['detect']['fiji']
+        boxsize = request.json['detect']['boxsize']
+        ip = request.json['detect']['ip']
 
         pipeline = pipeline.then(detect_task, path, zstack, video_split, graychannel, video, fiji, ip)
 

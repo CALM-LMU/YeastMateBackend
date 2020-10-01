@@ -48,7 +48,7 @@ def align_task(path, detect, alignment, video_split, channels, file_format, dime
                 alignment_channel_cam2=alignment_channel_cam2)   
 
 @huey.task()
-def detect_task(path, zstack, video_split, graychannel, video, fiji=True, ip="127.0.0.1:5000"):
+def detect_task(path, zstack, video_split, graychannel, video, fiji, boxsize, ip="127.0.0.1:5000"):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
@@ -107,7 +107,7 @@ def detect_task(path, zstack, video_split, graychannel, video, fiji=True, ip="12
             os.makedirs(out_dir)
         name = os.path.join(out_dir, imgname)
 
-        crop_img(ori_image, mating_boxes, name, fiji=fiji)
+        crop_img(ori_image, mating_boxes, name, fiji, boxsize)
 
 @huey.task()
 def mask_task(path, zstack, channels):
