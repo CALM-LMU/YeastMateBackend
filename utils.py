@@ -1,3 +1,5 @@
+import os
+import numpy as np
 from skimage.io import imsave
 
 def get_align_channel_vars(channels):
@@ -50,14 +52,38 @@ def get_detection_mask_channel_vars(channels):
 
     return channel_order
 
-def crop_img(img, bboxes, name):
+def crop_img(img, bboxes, name, fiji=True):
     for m, box in enumerate(bboxes):
-        try:
-            name_ = name + '_box{}'.format(m)
+        filename, extension = os.path.splitext(name)
+        name_ = filename + '_box{}'.format(m) + extension
 
-            x1, y1, x2, y2 = map(int, box)
-            new_im = img[:,:,y1:y2,x1:x2]
+        y1, x1, y2, x2 = map(int, box)
 
-            imsave(name_, new_im, imagej=True)
-        except:
+        print(box)
+      
+        if len(img.shape) == 4:
+            if img.shape[1] < img.shape[-1]:
+                new_im = img[:,:,y1:y2,x1:x2]
+            else:
+                new_im = img[:,y1:y2,x1:x2,:]
+                if fiji:
+                    new_im = np.transpose(new_im, (0,3,1,2))
+        elif len(img.shape) == 3:
+            if img.shape[0] < img.shape[-1]:
+                new_im = img[:,y1:y2,x1:x2]
+            else:
+                new_im = img[y1:y2,x1:x2,:]
+        elif len(img.shape) == 2:
+            new_im = img[y1:y2,x1:x2]
+        elif len(img.shape) == 5:
+            if img.shape[2] < img.shape[-1]:
+                new_im = img[:,:,:,y1:y2,x1:x2]
+            else:
+                new_im = img[:,:,y1:y2,x1:x2,:]
+                if fiji:
+                    new_im = np.transpose(new_im, (0,1,4,2,3))
+        else:
+            print('Not supported image shape!')
             continue
+
+        imsave(name_, new_im, imagej=True)

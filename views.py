@@ -93,18 +93,25 @@ def queue_job():
         zstack = request.json['detect']['zstack']
         video_split = request.json['detect']['videoSplit']
         boxsize = request.json['detect']['boxsize']
-        channels = request.json['detect']['channels']
+        graychannel = request.json['detect']['channels']
         video = request.json['detect']['video']
+        
+        try:
+            fiji = request.json['detect']['fiji']
+        except:
+            fiji = True
 
-        pipeline = pipeline.then(detect_task, path, mask, zstack, video_split, boxsize, channels, video)
+        try:
+            ip = request.json['detect']['ip']
+        except:
+            ip = "10.153.168.3"
+            
+        try:
+            port = request.json['detect']['port']
+        except:
+            port = 5000
 
-    if 'mask' in request.json.keys():
-        path = os.path.join(request.json['path'])
-
-        zstack = request.json['detect']['zstack']
-        channels = request.json['detect']['channels']
-
-        pipeline = pipeline.then(mask_task, path, zstack, channels)
+        pipeline = pipeline.then(detect_task, path, mask, zstack, video_split, boxsize, graychannel, video, fiji)
 
     huey.enqueue(pipeline)
 

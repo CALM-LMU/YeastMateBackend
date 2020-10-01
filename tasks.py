@@ -1,6 +1,9 @@
 import os
+import json
 import requests
 from glob import glob
+
+from skimage.exposure import rescale_intensity
 from skimage.io import imread, imsave
 
 import base64
@@ -45,9 +48,7 @@ def align_task(path, detect, mask, alignment, video_split, channels, file_format
                 alignment_channel_cam2=alignment_channel_cam2)   
 
 @huey.task()
-def detect_task(path, mask, zstack, video_split, boxsize, channels, video):
-    channel_order = get_detection_mask_channel_vars(channels)
-
+def detect_task(path, mask, zstack, video_split, boxsize, graychannel, video, fiji=True, ip=127.0.0.1, port=5000):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
@@ -58,24 +59,24 @@ def detect_task(path, mask, zstack, video_split, boxsize, channels, video):
     files_to_process = glob(os.path.join(in_dir, "*.tif"))
 
     for i, path in enumerate(files_to_process):
-        image = imread(path)
+        ori_image = imread(path)
+
+        image = np.squeeze(ori_image)
 
         if video:
             image = image[-1]
 
         if zstack:
             image = np.max(image, axis=0)
-        if len(image.shape) < 3:
-            image = np.expand_dims(image, axis=-1)
-            image = np.repeat(image, 3, axis=-1)
-        elif image.shape[-1] == 1:
-            image = np.repeat(image, 3, axis=-1)
 
-        if channel_order != [0,1,2]:
-            stack = []
-            for ch in channel_order:
-                stack.append(image[ch])
-            image = np.asarray(stack)
+        if len(image.shape) > 2:    
+            image = image[:,:, 0]
+
+        image = np.expand_dims(image, axis=-1)
+        image = np.repeat(image, 3, axis=-1)
+
+        image = rescale_intensity(image, out_range=(0,255))
+        image = image.astype(np.uint8)
      
         image = Image.fromarray(image)
         
@@ -84,31 +85,33 @@ def detect_task(path, mask, zstack, video_split, boxsize, channels, video):
         imagebytes.seek(0)
         imagedict = {"image": ('image.png', imagebytes, 'image/png')}
 
-        result = requests.post("http://127.0.0.1:5005/predict_box", files=imagedict)
+        result = requests.post("http://{}:{}/predict".format(ip, port), files=imagedict).json()
 
         mating_boxes = []
         boxes = result['boxes']
         classes = result['classes']
         scores = result['scores']
+
         try:
-            for n in range(len(boxes[idx])):
-                if classes[idx][n] == 0 or classes[idx][n] == 1 and scores[idx][n] > 0.5:
-                    mating_boxes.append(boxes[idx][n])
+            for n, box in enumerate(boxes):
+                if classes[n] == 1:
+                    mating_boxes.append(box)
         except:
             print("No boxes found in {}".format(paths[idx]), flush=True)
             continue
 
-        imgname = paths[idx].split('/')[-1]
+        imgname = os.path.basename(path)
         print('{} mating events detected in {}'.format(len(mating_boxes), imgname), flush=True)
 
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        name = os.path.join(out_dir, os.path.splitext(path)[0].rsplit("/", 1)[-1])
+        name = os.path.join(out_dir, imgname)
 
-        crop_img(image, mating_boxes, name)
+        crop_img(ori_image, mating_boxes, name, fiji=fiji)
 
 @huey.task()
 def mask_task(path, zstack, channels):
+    return
     channel_order = get_detection_mask_channel_vars(channels)
 
     if os.path.isdir(os.path.join(path, 'cropped')):
@@ -147,7 +150,7 @@ def mask_task(path, zstack, channels):
         imagebytes.seek(0)
         imagedict = {"image": ('image.png', imagebytes, 'image/png')}
 
-        response = requests.post("http://127.0.0.1:5005/predict_mask", files=imagedict)
+        response = requests.post("http://127.0.0.1:5000/predict_mask", files=imagedict)
 
         mating_boxes = []
         seg = result['pans'][0]
@@ -187,7 +190,7 @@ def mask_task(path, zstack, channels):
 
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        name = os.path.join(out_dir, os.path.splitext(path)[0].rsplit("/", 1)[-1])
+        name = os.path.join(out_dir, path.rsplit("/", 1)[-1])
 
         imsave(name+"_ATP6-NG.tif", atp)
         imsave(name+"_mtKate2.tif", kate)

@@ -9,8 +9,8 @@ from multiprocessing import freeze_support, Process
 
 from app import app
 from app import huey
-import tasks  # Import tasks so they are registered with Huey instance.
-import views  # Import views so they are registered with Flask app.
+from tasks import *  # Import tasks so they are registered with Huey instance.
+from views import *  # Import views so they are registered with Flask app.
 
 def consumer_main():
     # Set up logging for the "huey" namespace.
@@ -25,4 +25,4 @@ if __name__ == '__main__':
     freeze_support()
     proc = Process(target=consumer_main)
     proc.start()
-    app.run()
+    app.run(host='0.0.0.0', port=5005)

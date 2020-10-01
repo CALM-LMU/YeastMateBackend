@@ -3,14 +3,15 @@
 from pathlib import Path
 from glob import glob
 
+from PyInstaller.utils.hooks import get_package_paths
+
 block_cipher = None
 
-
 a = Analysis(['main.py'],
-             pathex=['C:\\Users\\david\\Projects\\flask_ex'],
+             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
              binaries=[],
-             datas=[],
-             hiddenimports=['pims_nd2', 'huey', 'scipy', 'scipy.special.cython_special', 'pkg_resources.py2_warn'],
+             datas=[(get_package_paths('dask')[1],"dask"), ('./tasks.py', '.'), ('./alignment.py', '.'), ('./utils.py', '.'), ('./views.py', '.'), ('./app.py', '.')],
+             hiddenimports=['pims_nd2', 'huey', 'scipy', 'scipy.special.cython_special', 'pkg_resources.py2_warn', 'dask', 'tasks', 'opencv-python', 'scikit-image'],
              hookspath=[],
              runtime_hooks=[],
              excludes=[],
@@ -18,9 +19,6 @@ a = Analysis(['main.py'],
              win_private_assemblies=False,
              cipher=block_cipher,
              noarchive=False)
-
-pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
 
 MISSING_DYLIBS = [
     Path('C:\\Users\\david\\miniconda3\\Lib\\site-packages\\pims_nd2\\ND2SDK\\win\\nd2ReadSDK.h')
@@ -35,13 +33,16 @@ a.binaries += TOC([
     (lib.name, str(lib.resolve()), 'BINARY') for lib in MISSING_DYLIBS
 ])
 
+pyz = PYZ(a.pure, a.zipped_data,
+             cipher=block_cipher)
+
 exe = EXE(pyz,
           a.scripts,
           a.binaries,
           a.zipfiles,
           a.datas,
           [],
-          name='main',
+          name='YeastMateBackend',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
