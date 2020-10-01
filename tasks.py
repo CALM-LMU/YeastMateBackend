@@ -19,11 +19,11 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 @huey.task()
-def start_pipeline(align, detect, mask, path):
+def start_pipeline(align, detect, path):
     return
 
 @huey.task()
-def align_task(path, detect, mask, alignment, video_split, channels, file_format, dimensions, series_suffix='_series{}'):
+def align_task(path, detect, alignment, video_split, channels, file_format, dimensions, series_suffix='_series{}'):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
     tif_channels = get_align_dimension_vars(dimensions)
 
@@ -48,7 +48,7 @@ def align_task(path, detect, mask, alignment, video_split, channels, file_format
                 alignment_channel_cam2=alignment_channel_cam2)   
 
 @huey.task()
-def detect_task(path, mask, zstack, video_split, boxsize, graychannel, video, fiji=True, ip=127.0.0.1, port=5000):
+def detect_task(path, zstack, video_split, graychannel, video, fiji=True, ip="127.0.0.1:5000"):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
@@ -85,7 +85,7 @@ def detect_task(path, mask, zstack, video_split, boxsize, graychannel, video, fi
         imagebytes.seek(0)
         imagedict = {"image": ('image.png', imagebytes, 'image/png')}
 
-        result = requests.post("http://{}:{}/predict".format(ip, port), files=imagedict).json()
+        result = requests.post("http://{}/predict".format(ip), files=imagedict).json()
 
         mating_boxes = []
         boxes = result['boxes']

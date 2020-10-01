@@ -52,33 +52,47 @@ def get_detection_mask_channel_vars(channels):
 
     return channel_order
 
+def enlarge_box(box, height, width):
+    y1, x1, y2, x2 = map(int, box)
+
+    y1 = max(0, (y1 - int((y2-y1)*0.1)))
+    x1 = max(0, (x1 - int((x2-x1)*0.1)))
+
+    y2 = min(height, (y2 + int((y2-y1)*0.1)))
+    x2 = min(width, (x2 + int((x2-x1)*0.1)))
+
+    return y1, x1, y2, x2
+
 def crop_img(img, bboxes, name, fiji=True):
     for m, box in enumerate(bboxes):
         filename, extension = os.path.splitext(name)
         name_ = filename + '_box{}'.format(m) + extension
-
-        y1, x1, y2, x2 = map(int, box)
-
-        print(box)
       
         if len(img.shape) == 4:
             if img.shape[1] < img.shape[-1]:
+                y1, x1, y2, x2 = enlarge_box(box, img.shape[-2], img.shape[-1])
                 new_im = img[:,:,y1:y2,x1:x2]
             else:
+                y1, x1, y2, x2 = enlarge_box(box, img.shape[1], img.shape[2])
                 new_im = img[:,y1:y2,x1:x2,:]
                 if fiji:
                     new_im = np.transpose(new_im, (0,3,1,2))
         elif len(img.shape) == 3:
             if img.shape[0] < img.shape[-1]:
+                y1, x1, y2, x2 = enlarge_box(box, img.shape[-2], img.shape[-1])
                 new_im = img[:,y1:y2,x1:x2]
             else:
+                y1, x1, y2, x2 = enlarge_box(box, img.shape[0], img.shape[1])
                 new_im = img[y1:y2,x1:x2,:]
         elif len(img.shape) == 2:
+            y1, x1, y2, x2 = enlarge_box(box, img.shape[0], img.shape[1])
             new_im = img[y1:y2,x1:x2]
         elif len(img.shape) == 5:
             if img.shape[2] < img.shape[-1]:
+                y1, x1, y2, x2 = enlarge_box(box, img.shape[-2], img.shape[-1])
                 new_im = img[:,:,:,y1:y2,x1:x2]
             else:
+                y1, x1, y2, x2 = enlarge_box(box, img.shape[-3], img.shape[-2])
                 new_im = img[:,:,y1:y2,x1:x2,:]
                 if fiji:
                     new_im = np.transpose(new_im, (0,1,4,2,3))

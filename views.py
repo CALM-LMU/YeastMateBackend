@@ -6,7 +6,7 @@ from flask import render_template
 from flask import request, jsonify
 
 from app import app
-from tasks import start_pipeline, align_task, detect_task, mask_task
+from tasks import start_pipeline, align_task, detect_task
 
 from app import huey
 
@@ -24,18 +24,10 @@ def add_execute_task(task):
 
         if task.args[1]:
             tasks[task.id+'detect'] = {'Job': 'Detection', 'Path': task.args[0], 'Status': 'Pending'}
-        if task.args[2]:
-            tasks[task.id+'mask'] = {'Job': 'Masking', 'Path': task.args[0], 'Status': 'Pending'}
 
     elif task.name == 'detect_task':
         tasks[task.id+'detect'] = {'Job': 'Detection', 'Path': task.args[0], 'Status': 'Running'}
 
-        if task.args[1]:
-            tasks[task.id+'mask'] = {'Job': 'Masking', 'Path': task.args[0], 'Status': 'Pending'}
-
-    elif task.name == 'mask_task':
-        job = 'Masking'
-        tasks[task.id+'mask'] = {'Job': 'Masking', 'Path': task.args[0], 'Status': 'Running'}
     else:
         return
 
@@ -55,26 +47,18 @@ def remove_execute_task(task, task_value, exc):
         except:
             pass
 
-        try:
-            del tasks[task.id+'mask']
-        except:
-            pass
-
         huey.storage.put_data('tasks', json.dumps(tasks).encode('utf-8'))
 
 @app.route('/', methods=['POST'])
 def queue_job():
     align = False
     detect = False
-    mask = False
     if 'align' in request.json.keys():
         align = True
     if 'detect' in request.json.keys():
         detect = True
-    if 'mask' in request.json.keys():
-        mask = True
 
-    pipeline = start_pipeline.s(align, detect, mask, request.json['path'])
+    pipeline = start_pipeline.s(align, detect, request.json['path'])
     
     if 'align' in request.json.keys():
         path = os.path.join(request.json['path'])
@@ -85,16 +69,19 @@ def queue_job():
         file_format = request.json['align']['inputFileFormat'] 
         dimensions = request.json['align']['dimensions']
 
-        pipeline = pipeline.then(align_task, path, detect, mask, alignment, video_split, channels, file_format, dimensions)
+        pipeline = pipeline.then(align_task, path, detect, alignment, video_split, channels, file_format, dimensions)
 
     if 'detect' in request.json.keys():
         path = os.path.join(request.json['path'])
 
         zstack = request.json['detect']['zstack']
         video_split = request.json['detect']['videoSplit']
-        boxsize = request.json['detect']['boxsize']
-        graychannel = request.json['detect']['channels']
         video = request.json['detect']['video']
+
+        try:
+            graychannel = request.json['detect']['graychannel']
+        except:
+            graychannel = 0
         
         try:
             fiji = request.json['detect']['fiji']
@@ -104,14 +91,9 @@ def queue_job():
         try:
             ip = request.json['detect']['ip']
         except:
-            ip = "10.153.168.3"
-            
-        try:
-            port = request.json['detect']['port']
-        except:
-            port = 5000
+            ip = "10.153.168.3:5000"
 
-        pipeline = pipeline.then(detect_task, path, mask, zstack, video_split, boxsize, graychannel, video, fiji)
+        pipeline = pipeline.then(detect_task, path, zstack, video_split, graychannel, video, fiji, ip)
 
     huey.enqueue(pipeline)
 
@@ -132,10 +114,6 @@ def get_tasklist():
                 job = 'Detection'
                 tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
 
-                if t.args[2]:
-                    job = 'Masking'
-                    tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
-
         elif t.name == 'align_task':
             job = 'Alignment'
             tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
@@ -144,20 +122,8 @@ def get_tasklist():
                 job = 'Detection'
                 tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
 
-                if t.args[2]:
-                    job = 'Masking'
-                    tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
-
         elif t.name == 'detect_task':
             job = 'Detection'
-            tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
-
-            if t.args[1]:
-                job = 'Masking'
-                tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
-
-        elif t.name == 'mask_task':
-            job = 'Masking'
             tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
 
         else:
