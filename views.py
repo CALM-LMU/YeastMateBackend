@@ -64,25 +64,24 @@ def queue_job():
         path = os.path.join(request.json['path'])
 
         alignment = request.json['align']['alignment']
-        video_split = request.json['align']['videoSplit']
         channels = request.json['align']['channels'] 
         file_format = request.json['align']['inputFileFormat'] 
         dimensions = request.json['align']['dimensions']
 
-        pipeline = pipeline.then(align_task, path, detect, alignment, video_split, channels, file_format, dimensions)
+        pipeline = pipeline.then(align_task, path, detect, alignment, channels, file_format, dimensions)
 
     if 'detect' in request.json.keys():
         path = os.path.join(request.json['path'])
 
         zstack = request.json['detect']['zstack']
-        video_split = request.json['detect']['videoSplit']
         video = request.json['detect']['video']
         graychannel = request.json['detect']['graychannel']
-        fiji = request.json['detect']['fiji']
         boxsize = request.json['detect']['boxsize']
+        box_expansion = request.json['detect']['boxExpansion']
+        frame_selection = request.json['detect']['frameSelection']
         ip = request.json['detect']['ip']
 
-        pipeline = pipeline.then(detect_task, path, zstack, video_split, graychannel, video, fiji, ip)
+        pipeline = pipeline.then(detect_task, path, zstack, graychannel, video, frame_selection, box_expansion, boxsize, ip)
 
     huey.enqueue(pipeline)
 

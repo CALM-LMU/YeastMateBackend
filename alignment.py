@@ -125,8 +125,6 @@ def process_single_file(counter, path, out_dir, alignment="True", video_split="F
 
         reader.bundle_axes = bundleax
         reader.iter_axes = iterax
-
-        savepoint = t - 1
         
         # go through single images
         timestack = []
@@ -186,7 +184,7 @@ def process_single_file(counter, path, out_dir, alignment="True", video_split="F
                 # save as ImageJ-compatible tiff stack
                 imsave(outfile, res, imagej=True)
       
-            if idx % savepoint == 0 and fileidx != 1:
+            if (idx+1) % t == 0:
                 folderidx = idx // t + 1
 
                 res = np.asarray(timestack)

@@ -5,6 +5,7 @@ from huey.consumer_options import ConsumerConfig
 from huey.consumer_options import OptionParserHandler
 from huey.utils import load_class
 
+import multiprocessing
 from multiprocessing import freeze_support, Process
 
 from app import app
@@ -18,7 +19,7 @@ def consumer_main():
     config = ConsumerConfig()
     config.setup_logger(logger)
 
-    consumer = huey.create_consumer(workers=4, periodic=False, backoff=1)
+    consumer = huey.create_consumer(workers=1, periodic=False, backoff=1)
     consumer.run()
 
 if __name__ == '__main__':

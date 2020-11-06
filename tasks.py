@@ -1,14 +1,10 @@
 import os
 import json
-import requests
 from glob import glob
 
-from skimage.exposure import rescale_intensity
-from skimage.io import imread, imsave
-
-import base64
-from io import BytesIO
-from PIL import Image
+from skimage.measure import regionprops
+from skimage.external.tifffile import imread as tifimread
+from skimage.external.tifffile import imsave as tifimsave
 
 from app import huey
 
@@ -18,12 +14,14 @@ from utils import *
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
+
 @huey.task()
 def start_pipeline(align, detect, path):
     return
 
+
 @huey.task()
-def align_task(path, detect, alignment, video_split, channels, file_format, dimensions, series_suffix='_series{}'):
+def align_task(path, detect, alignment, channels, file_format, dimensions, series_suffix='_series{}'):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
     tif_channels = get_align_dimension_vars(dimensions)
 
@@ -47,151 +45,82 @@ def align_task(path, detect, alignment, video_split, channels, file_format, dime
                 alignment_channel_cam1=alignment_channel_cam1, 
                 alignment_channel_cam2=alignment_channel_cam2)   
 
+
 @huey.task()
-def detect_task(path, zstack, video_split, graychannel, video, fiji, boxsize, ip="127.0.0.1:5000"):
+def detect_task(path, zstack, graychannel, video, frame_selection, box_expansion, boxsize, ip):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
         in_dir = path
 
-    out_dir = os.path.join(path, 'cropped')
-
     files_to_process = glob(os.path.join(in_dir, "*.tif"))
 
-    for i, path in enumerate(files_to_process):
-        ori_image = imread(path)
+    for i,path in enumerate(files_to_process):
+        ori_image = tifimread(path)
 
         image = np.squeeze(ori_image)
 
         if video:
-            image = image[-1]
+            if frame_selection == 'last':
+                imagelist = [image[-1]]
+            elif frame_selection == 'first':
+                imagelist = [image[0]]
+            elif frame_selection == 'all':
+                imagelist = image
+        else:
+            imagelist = [image]
 
-        if zstack:
-            image = np.max(image, axis=0)
+        resdict = {'image': os.path.basename(path)[-1], 'detections': []}
 
-        if len(image.shape) > 2:    
-            image = image[:,:, 0]
+        for n,img in enumerate(imagelist):
+            mask, meta = detect_one_image(img, zstack, graychannel, ip)
 
-        image = np.expand_dims(image, axis=-1)
-        image = np.repeat(image, 3, axis=-1)
+            things = regionprops(mask)
 
-        image = rescale_intensity(image, out_range=(0,255))
-        image = image.astype(np.uint8)
-     
-        image = Image.fromarray(image)
-        
-        imagebytes = BytesIO()
-        image.save(imagebytes, format="PNG")
-        imagebytes.seek(0)
-        imagedict = {"image": ('image.png', imagebytes, 'image/png')}
+            frame = {'frame': n, 'things': []}
+            for t, thing in enumerate(things):
+                assert meta[t]['id'] == thing.label
 
-        result = requests.post("http://{}/predict".format(ip), files=imagedict).json()
+                if meta[t]['isthing']:
+                    obj = {'id': meta[t]['id'], 'class': meta[t]['category_id'], 'box': thing.bbox, 'score': np.round(meta[t]['score'], decimals=2)}
+                    frame['things'].append(obj)
 
-        mating_boxes = []
-        boxes = result['boxes']
-        classes = result['classes']
-        scores = result['scores']
+            resdict['detections'].append(frame)
 
-        try:
-            for n, box in enumerate(boxes):
-                if classes[n] == 1:
-                    mating_boxes.append(box)
-        except:
-            print("No boxes found in {}".format(paths[idx]), flush=True)
-            continue
+        with open(path.replace('.tif', '_detections.json'), 'w') as file:
+            doc = json.dump(dictting, file, indent=1)
 
-        imgname = os.path.basename(path)
-        print('{} mating events detected in {}'.format(len(mating_boxes), imgname), flush=True)
-
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-        name = os.path.join(out_dir, imgname)
-
-        crop_img(ori_image, mating_boxes, name, fiji, boxsize)
+        tifimsave(path.replace('.tif', '_mask.tif'), mask)
+                
 
 @huey.task()
-def mask_task(path, zstack, channels):
-    return
-    channel_order = get_detection_mask_channel_vars(channels)
+def export_task()
+    pass
 
-    if os.path.isdir(os.path.join(path, 'cropped')):
-        in_dir = os.path.join(path, 'cropped')
-    else:
-        in_dir = path
+    # things = regionprops(mask)
 
-    out_dir = os.path.join(path, 'masked')
+    # boxes = []
+    # classes = []
+    # scores = []
+    # for n, thing in enumerate(things):
+    #     assert meta[n]['id'] == thing.label
 
-    files_to_process = glob(os.path.join(in_dir, "*.tif"))
+    #     if meta[n]['isthing']:
+    #         boxes.append(thing.bbox)
+    #         classes.append(meta[n]['category_id'])
+    #         scores.append(np.round(meta[n]['score'], decimals=2))
 
-    for i, path in enumerate(files_to_process):
-        image = imread(path)
+    # mating_boxes = []
+    # boxes = result['boxes']
+    # classes = result['classes']
+    # scores = result['scores']
 
-        if video:
-            image = image[-1]
+    # try:
+    #     for n, box in enumerate(boxes):
+    #         if classes[n] == 1:
+    #             mating_boxes.append(box)
+    # except:
+    #     pass
 
-        if zstack:
-            image = np.max(image, axis=0)
-        if len(image.shape) < 3:
-            image = np.expand_dims(image, axis=-1)
-            image = np.repeat(image, 3, axis=-1)
-        elif image.shape[-1] == 1:
-            image = np.repeat(image, 3, axis=-1)
-
-        if channel_order != [0,1,2]:
-            stack = []
-            for ch in channel_order:
-                stack.append(image[ch])
-            image = np.asarray(stack)
         
-        image = Image.fromarray(image)
-        
-        imagebytes = BytesIO()
-        image.save(imagebytes, format="PNG")
-        imagebytes.seek(0)
-        imagedict = {"image": ('image.png', imagebytes, 'image/png')}
 
-        response = requests.post("http://127.0.0.1:5000/predict_mask", files=imagedict)
-
-        mating_boxes = []
-        seg = result['pans'][0]
-        meta = result['pans'][1]
-        
-        atp = np.zeros_like(seg)
-        kate = np.zeros_like(seg)
-        daughter = np.zeros_like(seg)
-
-        spent_cats = []
-        extra_cats = []
-        for item in meta[:3]:
-            if item["category_id"] not in spent_cats:
-                if item["category_id"] == 1:
-                    atp[seg==item["id"]] = 1
-                elif item["category_id"] == 2:
-                    kate[seg==item["id"]] = 1
-                elif item["category_id"] == 3:
-                    daughter[seg==item["id"]] = 1
-                spent_cats.append(item["category_id"])
-            else:
-                extra_cats.append(item)
-
-        if len(extra_cats) == 1:
-            for n, item in enumerate(meta[:3]):
-                if n not in spent_cats:
-                    if item["category_id"] == 1:
-                        atp[seg==item["id"]] = 1
-                    elif item["category_id"] == 2:
-                        kate[seg==item["id"]] = 1
-                    elif item["category_id"] == 3:
-                        daughter[seg==item["id"]] = 1
-        elif len(extra_cats) == 0:
-            pass
-        else:
-            print('Cell identities could not be determined!', flush=True)
-
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-        name = os.path.join(out_dir, path.rsplit("/", 1)[-1])
-
-        imsave(name+"_ATP6-NG.tif", atp)
-        imsave(name+"_mtKate2.tif", kate)
-        imsave(name+"_daughter.tif", daughter)

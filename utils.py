@@ -1,6 +1,15 @@
 import os
+import json
+import requests
 import numpy as np
-from skimage.io import imsave
+
+import base64
+from io import BytesIO
+from PIL import Image
+
+from skimage.exposure import rescale_intensity
+from skimage.io import imsave as skimsave
+from skimage.external.tifffile import imsave as tifimsave
 
 def get_align_channel_vars(channels):
     channels_cam1 = []
@@ -54,19 +63,49 @@ def get_detection_mask_channel_vars(channels):
 
 def enlarge_box(box, boxsize, height, width):
     y1, x1, y2, x2 = map(int, box)
+    boxsize = boxsize//2
 
-    centerx = (x1 + x2) / 2
-    centery = (y1 + y2) / 2
+    centerx = (x1 + x2) // 2
+    centery = (y1 + y2) // 2
 
-    centerx = min(max(0+boxsize, centerx), w-boxsize)
-    centery = min(max(0+boxsize, centery), h-boxsize)
+    centerx = min(max(0+boxsize, centerx), width-boxsize)
+    centery = min(max(0+boxsize, centery), height-boxsize)
 
     return centery-boxsize, centerx-boxsize, centery+boxsize, centerx+boxsize
 
-def crop_img(img, bboxes, name, fiji, boxsize):
+
+def detect_one_image(image, zstack, graychannel, ip):
+    if zstack:
+        image = np.max(image, axis=0)
+
+    if len(image.shape) > 2:    
+        image = image[graychannel,:,:]
+
+    image = np.expand_dims(image, axis=-1)
+    image = np.repeat(image, 3, axis=-1)
+
+    image = rescale_intensity(image, out_range=(0,255))
+    image = image.astype(np.uint8)
+    
+    image = Image.fromarray(image)
+    
+    imagebytes = BytesIO()
+    image.save(imagebytes, format="PNG")
+    imagebytes.seek(0)
+    imagedict = {"image": ('image.png', imagebytes, 'image/png')}
+
+    result = requests.post("http://{}/predict".format(ip), files=imagedict).json()
+
+    mask = np.asarray(result['mask'])
+    meta = result['meta']
+
+    return mask, meta
+
+
+def crop_img(img, bboxes, name, boxsize, video_split):
     for m, box in enumerate(bboxes):
         filename, extension = os.path.splitext(name)
-        name_ = filename + '_box{}'.format(m) + extension
+        name_ = filename + '_box{}'.format(m)
       
         if len(img.shape) == 4:
             if img.shape[1] < img.shape[-1]:
@@ -75,8 +114,6 @@ def crop_img(img, bboxes, name, fiji, boxsize):
             else:
                 y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[1], img.shape[2])
                 new_im = img[:,y1:y2,x1:x2,:]
-                if fiji:
-                    new_im = np.transpose(new_im, (0,3,1,2))
         elif len(img.shape) == 3:
             if img.shape[0] < img.shape[-1]:
                 y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[-2], img.shape[-1])
@@ -94,10 +131,22 @@ def crop_img(img, bboxes, name, fiji, boxsize):
             else:
                 y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[-3], img.shape[-2])
                 new_im = img[:,:,y1:y2,x1:x2,:]
-                if fiji:
-                    new_im = np.transpose(new_im, (0,1,4,2,3))
         else:
             print('Not supported image shape!')
             continue
 
-        imsave(name_, new_im, imagej=True)
+        if video_split:
+            # get filename before suffix
+            foldername, filename = os.path.split(name_)
+
+            if not os.path.exists(os.path.join(foldername, filename + '_single_frames')):
+                os.makedirs(os.path.join(foldername, filename + '_single_frames'))
+
+            for fileidx in range(new_im.shape[0]):
+                # construct new filename
+                outfile = os.path.join(foldername, filename + '_single_frames', filename + '_slice{}'.format(fileidx) + '.tif')
+                            
+                # save as ImageJ-compatible tiff stack
+                tifimsave(outfile, new_im[fileidx], imagej=True)
+        
+        tifimsave(name_ + '.tif', new_im, imagej=True)
