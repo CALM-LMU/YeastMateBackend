@@ -88,39 +88,19 @@ def detect_task(path, zstack, graychannel, video, frame_selection, box_expansion
             resdict['detections'].append(frame)
 
         with open(path.replace('.tif', '_detections.json'), 'w') as file:
-            doc = json.dump(dictting, file, indent=1)
+            doc = json.dump(resdict, file, indent=1)
 
         tifimsave(path.replace('.tif', '_mask.tif'), mask)
                 
 
 @huey.task()
-def export_task()
-    pass
+def export_task(path):
+    mask = tifimread(path)
+    
+    with open(path.replace('.tif', '_detections.json')) as file:
+        metadict = json.load(file)
 
-    # things = regionprops(mask)
-
-    # boxes = []
-    # classes = []
-    # scores = []
-    # for n, thing in enumerate(things):
-    #     assert meta[n]['id'] == thing.label
-
-    #     if meta[n]['isthing']:
-    #         boxes.append(thing.bbox)
-    #         classes.append(meta[n]['category_id'])
-    #         scores.append(np.round(meta[n]['score'], decimals=2))
-
-    # mating_boxes = []
-    # boxes = result['boxes']
-    # classes = result['classes']
-    # scores = result['scores']
-
-    # try:
-    #     for n, box in enumerate(boxes):
-    #         if classes[n] == 1:
-    #             mating_boxes.append(box)
-    # except:
-    #     pass
+    
 
         
 

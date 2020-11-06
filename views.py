@@ -6,7 +6,7 @@ from flask import render_template
 from flask import request, jsonify
 
 from app import app
-from tasks import start_pipeline, align_task, detect_task
+from tasks import start_pipeline, align_task, detect_task, export_task
 
 from app import huey
 
@@ -82,6 +82,11 @@ def queue_job():
         ip = request.json['detect']['ip']
 
         pipeline = pipeline.then(detect_task, path, zstack, graychannel, video, frame_selection, box_expansion, boxsize, ip)
+
+    if 'export' in request.json.keys():
+        path = os.path.join(request.json['path'])
+
+        pipeline = pipeline.then(export_task, path)
 
     huey.enqueue(pipeline)
 
