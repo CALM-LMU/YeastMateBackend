@@ -59,34 +59,41 @@ def queue_job():
         detect = True
 
     pipeline = start_pipeline.s(align, detect, request.json['path'])
+
+    print(request.json)
     
-    if 'align' in request.json.keys():
+    if 'preprocessing' in request.json.keys():
         path = os.path.join(request.json['path'])
 
-        alignment = request.json['align']['alignment']
-        channels = request.json['align']['channels'] 
-        file_format = request.json['align']['inputFileFormat'] 
-        dimensions = request.json['align']['dimensions']
+        alignment = request.json['preprocessing']['alignment']
+        channels = request.json['preprocessing']['channels'] 
+        file_format = request.json['preprocessing']['inputFileFormat'] 
+        dimensions = request.json['preprocessing']['dimensions']
 
         pipeline = pipeline.then(align_task, path, detect, alignment, channels, file_format, dimensions)
 
-    if 'detect' in request.json.keys():
+    if 'detection' in request.json.keys():
         path = os.path.join(request.json['path'])
 
-        zstack = request.json['detect']['zstack']
-        video = request.json['detect']['video']
-        graychannel = request.json['detect']['graychannel']
-        boxsize = request.json['detect']['boxsize']
-        box_expansion = request.json['detect']['boxExpansion']
-        frame_selection = request.json['detect']['frameSelection']
-        ip = request.json['detect']['ip']
+        zstack = request.json['detection']['zstack']
+        video = request.json['detection']['video']
+        graychannel = request.json['detection']['graychannel']
+        boxsize = request.json['detection']['boxsize']
+        box_expansion = request.json['detection']['boxExpansion']
+        frame_selection = request.json['detection']['frameSelection']
+        ip = request.json['detection']['ip']
 
         pipeline = pipeline.then(detect_task, path, zstack, graychannel, video, frame_selection, box_expansion, boxsize, ip)
 
     if 'export' in request.json.keys():
         path = os.path.join(request.json['path'])
 
-        pipeline = pipeline.then(export_task, path)
+        crop = request.json['export']['crop']
+        classes = request.json['export']['classes']
+        video_split = request.json['export']['videoSplit']
+        score_threshold = float(request.json['export']['scoreThreshold'])
+
+        pipeline = pipeline.then(export_task, path, crop, classes, video_split, score_threshold)
 
     huey.enqueue(pipeline)
 

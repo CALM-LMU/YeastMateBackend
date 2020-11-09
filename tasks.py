@@ -67,11 +67,15 @@ def detect_task(path, zstack, graychannel, video, frame_selection, box_expansion
                 imagelist = [image[0]]
             elif frame_selection == 'all':
                 imagelist = image
+
+            frame_detection = frame_selection
         else:
             imagelist = [image]
+            frame_detection = 'null'
 
-        resdict = {'image': os.path.basename(path)[-1], 'detections': []}
+        resdict = {'image': os.path.basename(path)[-1], 'detection_frame': frame_detection, 'detections': []}
 
+        maskarray = []
         for n,img in enumerate(imagelist):
             mask, meta = detect_one_image(img, zstack, graychannel, ip)
 
@@ -81,24 +85,80 @@ def detect_task(path, zstack, graychannel, video, frame_selection, box_expansion
             for t, thing in enumerate(things):
                 assert meta[t]['id'] == thing.label
 
+                if box_expansion:
+                    y1, x1, y2, x2 = enlarge_box(thing.bbox, boxsize, mask.shape[0], mask.shape[1])
+                else:
+                    y1, x1, y2, x2 = map(int, thing.bbox)
+
                 if meta[t]['isthing']:
-                    obj = {'id': meta[t]['id'], 'class': meta[t]['category_id'], 'box': thing.bbox, 'score': np.round(meta[t]['score'], decimals=2)}
+                    obj = {'id': meta[t]['id'], 'class': meta[t]['category_id'], 'box': [x1, y1, x2, y2], 'score': np.round(meta[t]['score'], decimals=2)}
                     frame['things'].append(obj)
 
             resdict['detections'].append(frame)
+            maskarray.append(mask)
 
         with open(path.replace('.tif', '_detections.json'), 'w') as file:
             doc = json.dump(resdict, file, indent=1)
+
+        maskarray = np.asarray(mask)
+        maskarray = np.squeeze(maskarray)
 
         tifimsave(path.replace('.tif', '_mask.tif'), mask)
                 
 
 @huey.task()
-def export_task(path):
-    mask = tifimread(path)
+def export_task(path, crop, classes, video_split, score_threshold):
+    if os.path.isdir(os.path.join(path, 'aligned')):
+        in_dir = os.path.join(path, 'aligned')
+    else:
+        in_dir = path
+
+    files_to_process = glob(os.path.join(in_dir, "*_detections.json"))
+
+    crop_classes, mask_classes, tags = parse_export_classes(classes)
+
+    if len(crop_classes) == 0 and len(mask_classes) == 0:
+        return
     
-    with open(path.replace('.tif', '_detections.json')) as file:
-        metadict = json.load(file)
+    out_dir = os.path.join(path, 'crops')
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    for filepath in files_to_process:
+        with open(filepath) as file:
+            metadict = json.load(file)
+
+        if len(crop_classes) != 0:
+            image = tifimread(filepath.replace('_detections.json', '.tif'))
+
+        if len(mask_classes) != 0:
+            mask = tifimread(filepath.replace('_detections.json', '_mask.tif'))
+
+        filename = os.path.basename(filepath.replace('_detections.json', '.tif'))
+
+        for frame in metadict['detections']:
+            for index, thing in enumerate(frame['things']):
+                if float(thing['score']) < score_threshold:
+                    continue
+
+                box = thing['box']
+
+                if metadict['detection_frame'] == 'all':
+                    if thing['class'] in crop_classes:
+                        crop_img(image[int(framekey)], box, out_dir, filename, tags[thing['class']], index, video_split=video_split, mask=False)
+                    if thing['class'] in mask_classes:
+                        crop_img(mask[int(framekey)], box, out_dir, filename, tags[thing['class']], index, video_split=video_split, mask=True)
+                else:
+                    if thing['class'] in crop_classes:
+                        crop_img(image, box, out_dir, filename, tags[thing['class']], index, video_split=video_split, mask=False)
+                    if thing['class'] in mask_classes:
+                        crop_img(mask, box, out_dir, filename, tags[thing['class']], index, video_split=video_split, mask=True)
+
+
+            if metadict['detection_frame'] != 'all':
+                break
+
+        
 
     
 

@@ -49,17 +49,21 @@ def get_align_dimension_vars(dimensions):
 
     return tif_channels
 
-def get_detection_mask_channel_vars(channels):
-    channel_order = [0, 1, 2]
-    for idx, ch in enumerate(channels):
-        if ch['Type'] == 'DIC':
-            channel_order[0] = idx
-        elif ch['Type'] == 'Red':
-            channel_order[1] = idx
-        elif ch['Type'] == 'Green':
-            channel_order[2] = idx
+def parse_export_classes(array):
+    crop_classes = []
+    mask_classes = []
 
-    return channel_order
+    tags = {}
+    for cls in array:
+        if cls['Crop'] == 'True':
+            crop_classes.append(int(cls['Class ID']) - 1)
+
+        if cls['Mask'] == 'True':
+            mask_classes.append(int(cls['Class ID']) - 1)
+
+        tags[int(cls['Class ID']) - 1] = cls['Tag']
+
+    return crop_classes, mask_classes, tags
 
 def enlarge_box(box, boxsize, height, width):
     y1, x1, y2, x2 = map(int, box)
@@ -102,51 +106,49 @@ def detect_one_image(image, zstack, graychannel, ip):
     return mask, meta
 
 
-def crop_img(img, bboxes, name, boxsize, video_split):
-    for m, box in enumerate(bboxes):
-        filename, extension = os.path.splitext(name)
-        name_ = filename + '_box{}'.format(m)
-      
-        if len(img.shape) == 4:
-            if img.shape[1] < img.shape[-1]:
-                y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[-2], img.shape[-1])
-                new_im = img[:,:,y1:y2,x1:x2]
-            else:
-                y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[1], img.shape[2])
-                new_im = img[:,y1:y2,x1:x2,:]
-        elif len(img.shape) == 3:
-            if img.shape[0] < img.shape[-1]:
-                y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[-2], img.shape[-1])
-                new_im = img[:,y1:y2,x1:x2]
-            else:
-                y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[0], img.shape[1])
-                new_im = img[y1:y2,x1:x2,:]
-        elif len(img.shape) == 2:
-            y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[0], img.shape[1])
-            new_im = img[y1:y2,x1:x2]
-        elif len(img.shape) == 5:
-            if img.shape[2] < img.shape[-1]:
-                y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[-2], img.shape[-1])
-                new_im = img[:,:,:,y1:y2,x1:x2]
-            else:
-                y1, x1, y2, x2 = enlarge_box(box, boxsize, img.shape[-3], img.shape[-2])
-                new_im = img[:,:,y1:y2,x1:x2,:]
+def negate_boolean(b):
+    return not b
+
+
+def crop_img(img, box, out_dir, filename, tag, index, video_split, mask):
+    basename, extension = os.path.splitext(filename)
+    name_ = basename + '_' + tag + '_' + str(index)
+
+    if mask:
+        name_ = name_ + '_mask'
+
+    x1, y1, x2, y2 = map(int, box)
+    
+    if len(img.shape) == 4:
+        if img.shape[1] < img.shape[-1]:
+            new_im = img[:,:,y1:y2,x1:x2]
         else:
-            print('Not supported image shape!')
-            continue
+            new_im = img[:,y1:y2,x1:x2,:]
+    elif len(img.shape) == 3:
+        if img.shape[0] < img.shape[-1]:
+            new_im = img[:,y1:y2,x1:x2]
+        else:
+            new_im = img[y1:y2,x1:x2,:]
+    elif len(img.shape) == 2:
+        new_im = img[y1:y2,x1:x2]
+    elif len(img.shape) == 5:
+        if img.shape[2] < img.shape[-1]:
+            new_im = img[:,:,:,y1:y2,x1:x2]
+        else:
+            new_im = img[:,:,y1:y2,x1:x2,:]
+    else:
+        print('Not supported image shape!')
+        return
 
-        if video_split:
-            # get filename before suffix
-            foldername, filename = os.path.split(name_)
+    if video_split:
+        if not os.path.exists(os.path.join(out_dir, name_ + '_single_frames')):
+            os.makedirs(os.path.join(out_dir, name_ + '_single_frames'))
 
-            if not os.path.exists(os.path.join(foldername, filename + '_single_frames')):
-                os.makedirs(os.path.join(foldername, filename + '_single_frames'))
-
-            for fileidx in range(new_im.shape[0]):
-                # construct new filename
-                outfile = os.path.join(foldername, filename + '_single_frames', filename + '_slice{}'.format(fileidx) + '.tif')
-                            
-                # save as ImageJ-compatible tiff stack
-                tifimsave(outfile, new_im[fileidx], imagej=True)
-        
-        tifimsave(name_ + '.tif', new_im, imagej=True)
+        for fileidx in range(new_im.shape[0]):
+            # construct new filename
+            outfile = os.path.join(out_dir, name_ + '_single_frames', name_ + '_slice{}'.format(fileidx) + '.tif')
+                        
+            # save as ImageJ-compatible tiff stack
+            tifimsave(outfile, new_im[fileidx], imagej=negate_boolean(mask))
+    else:
+        tifimsave(os.path.join(out_dir, name_ + '.tif'), new_im, imagej=negate_boolean(mask))
