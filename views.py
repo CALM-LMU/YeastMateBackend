@@ -59,8 +59,6 @@ def queue_job():
         detect = True
 
     pipeline = start_pipeline.s(align, detect, request.json['path'])
-
-    print(request.json)
     
     if 'preprocessing' in request.json.keys():
         path = os.path.join(request.json['path'])
@@ -87,6 +85,9 @@ def queue_job():
 
     if 'export' in request.json.keys():
         path = os.path.join(request.json['path'])
+
+
+        print(request.json)
 
         crop = request.json['export']['crop']
         classes = request.json['export']['classes']

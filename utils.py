@@ -1,4 +1,5 @@
 import os
+import copy
 import json
 import requests
 import numpy as np
@@ -139,6 +140,12 @@ def crop_img(img, box, out_dir, filename, tag, index, video_split, mask):
     else:
         print('Not supported image shape!')
         return
+
+    if mask:
+        new_im = copy.deepcopy(new_im)
+        new_im[new_im != int(index)] = 0
+        new_im[new_im > 0] = 1
+        new_im = new_im.astype(np.uint8)
 
     if video_split:
         if not os.path.exists(os.path.join(out_dir, name_ + '_single_frames')):

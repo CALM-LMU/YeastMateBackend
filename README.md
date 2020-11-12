@@ -1,2 +1,2 @@
-# MitoScannerBackend
-Python Backend for Electron Mitoscanner
+# YeastMate Backend
+Python Backend for YeastMate

@@ -3,7 +3,7 @@ import json
 from glob import glob
 
 from skimage.measure import regionprops
-from skimage.external.tifffile import imread as tifimread
+from tifffile import memmap as tifimread
 from skimage.external.tifffile import imsave as tifimsave
 
 from app import huey
@@ -37,7 +37,7 @@ def align_task(path, detect, alignment, channels, file_format, dimensions, serie
     # align and re-save all files
     for i, path in enumerate(files_to_process):
         process_single_file({'idx': i, 'total': len(files_to_process)}, os.path.join(in_dir, path), out_dir,
-                alignment=alignment, video_split=video_split,
+                alignment=alignment, 
                 file_format=file_format,
                 tif_channels=tif_channels, remove_channels=remove_channels, 
                 series_suffix=series_suffix,
@@ -73,11 +73,15 @@ def detect_task(path, zstack, graychannel, video, frame_selection, box_expansion
             imagelist = [image]
             frame_detection = 'null'
 
-        resdict = {'image': os.path.basename(path)[-1], 'detection_frame': frame_detection, 'detections': []}
+        resdict = {'image': os.path.basename(path)[-1], 'meta': {}, 'detection_frame': frame_detection, 'detections': []}
 
         maskarray = []
         for n,img in enumerate(imagelist):
             mask, meta = detect_one_image(img, zstack, graychannel, ip)
+
+            if n == 0:
+                resdict['meta']['height'] = mask.shape[0]
+                resdict['meta']['width'] = mask.shape[1]
 
             things = regionprops(mask)
 
@@ -93,6 +97,8 @@ def detect_task(path, zstack, graychannel, video, frame_selection, box_expansion
                 if meta[t]['isthing']:
                     obj = {'id': meta[t]['id'], 'class': meta[t]['category_id'], 'box': [x1, y1, x2, y2], 'score': np.round(meta[t]['score'], decimals=2)}
                     frame['things'].append(obj)
+                else:
+                    mask[mask == meta[t]['id']] = 0
 
             resdict['detections'].append(frame)
             maskarray.append(mask)
@@ -100,10 +106,15 @@ def detect_task(path, zstack, graychannel, video, frame_selection, box_expansion
         with open(path.replace('.tif', '_detections.json'), 'w') as file:
             doc = json.dump(resdict, file, indent=1)
 
-        maskarray = np.asarray(mask)
-        maskarray = np.squeeze(maskarray)
+        maskarray = np.asarray(maskarray)
 
-        tifimsave(path.replace('.tif', '_mask.tif'), mask)
+        if video and frame_selection != 'all':
+            maskarray = np.repeat(maskarray, image.shape[0], axis=0)
+
+        maskarray = np.squeeze(maskarray)
+        maskarray = maskarray.astype(np.uint16)
+
+        tifimsave(path.replace('.tif', '_mask.tif'), maskarray)
                 
 
 @huey.task()
@@ -137,7 +148,7 @@ def export_task(path, crop, classes, video_split, score_threshold):
         filename = os.path.basename(filepath.replace('_detections.json', '.tif'))
 
         for frame in metadict['detections']:
-            for index, thing in enumerate(frame['things']):
+            for thing in frame['things']:
                 if float(thing['score']) < score_threshold:
                     continue
 
@@ -145,15 +156,14 @@ def export_task(path, crop, classes, video_split, score_threshold):
 
                 if metadict['detection_frame'] == 'all':
                     if thing['class'] in crop_classes:
-                        crop_img(image[int(framekey)], box, out_dir, filename, tags[thing['class']], index, video_split=video_split, mask=False)
+                        crop_img(image[int(framekey)], box, out_dir, filename, tags[thing['class']], thing['id'], video_split=video_split, mask=False)
                     if thing['class'] in mask_classes:
-                        crop_img(mask[int(framekey)], box, out_dir, filename, tags[thing['class']], index, video_split=video_split, mask=True)
+                        crop_img(mask[int(framekey)], box, out_dir, filename, tags[thing['class']], thing['id'], video_split=video_split, mask=True)
                 else:
                     if thing['class'] in crop_classes:
-                        crop_img(image, box, out_dir, filename, tags[thing['class']], index, video_split=video_split, mask=False)
+                        crop_img(image, box, out_dir, filename, tags[thing['class']], thing['id'], video_split=video_split, mask=False)
                     if thing['class'] in mask_classes:
-                        crop_img(mask, box, out_dir, filename, tags[thing['class']], index, video_split=video_split, mask=True)
-
+                        crop_img(mask, box, out_dir, filename, tags[thing['class']], thing['id'], video_split=video_split, mask=True)
 
             if metadict['detection_frame'] != 'all':
                 break

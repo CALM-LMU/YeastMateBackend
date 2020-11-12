@@ -91,7 +91,7 @@ def transform_planewise(img, model, axes):
     return img_t
 
 
-def process_single_file(counter, path, out_dir, alignment="True", video_split="False", file_format='.nd2', tif_channels=None, remove_channels=None, series_suffix='_series{}',
+def process_single_file(counter, path, out_dir, alignment="True", file_format='.nd2', tif_channels=None, remove_channels=None, series_suffix='_series{}',
                         channels_cam1=(0,2), channels_cam2=(1,3),
                         alignment_channel_cam1=0,           
                         alignment_channel_cam2=1):
@@ -170,19 +170,6 @@ def process_single_file(counter, path, out_dir, alignment="True", video_split="F
             
             folderidx = idx // t + 1
             fileidx = (idx - (folderidx-1) * t) + 1
-            if video_split:
-                # get filename before suffix
-                h,ta = os.path.split(path)
-                filename = ta.rsplit('.',1)[0]
-
-                if not os.path.exists(os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames')):
-                    os.makedirs(os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames'))
-                
-                # construct new filename
-                outfile = os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames', filename + series_suffix.format(folderidx) + '_slice{}'.format(fileidx) + '.tif')
-                            
-                # save as ImageJ-compatible tiff stack
-                imsave(outfile, res, imagej=True)
       
             if (idx+1) % t == 0:
                 folderidx = idx // t + 1
@@ -275,20 +262,6 @@ def process_single_file(counter, path, out_dir, alignment="True", video_split="F
 
                     progress = (idf+1)*(idt+1) / total * 100
                     progress = progress / counter['total'] * (counter['idx']+1)
-
-                    if video_split:
-                        # get filename before suffix
-                        h,ta = os.path.split(path)
-                        filename = ta.rsplit('.',1)[0]
-
-                        if not os.path.exists(os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames')):
-                            os.makedirs(os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames'))
-                        
-                        # construct new filename
-                        outfile = os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames', filename + series_suffix.format(idf) + '_slice{}'.format(idt) + '.tif')
-                                        
-                        # save as ImageJ-compatible tiff stack
-                        imsave(outfile, res, imagej=True)
 
                     timestack.append(res)
 
