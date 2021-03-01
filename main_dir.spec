@@ -1,16 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from ctypes.util import find_library
 from pathlib import Path
 from glob import glob
+
+from PyInstaller.utils.hooks import get_package_paths
 
 block_cipher = None
 
 a = Analysis(['main.py'],
-             pathex=['C:\\Users\\david\\Projects\\flask_ex'],
+             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
              binaries=[],
-             datas=[],
-             hiddenimports=['pims_nd2', 'huey', 'scipy', 'scipy.special.cython_special', 'pkg_resources.py2_warn', 'dask'],
-             hookspath=[],
+             datas=[(get_package_paths('dask')[1],"dask"), (get_package_paths('pims')[1],"pims"), (get_package_paths('pims_nd2')[1],"pims_nd2"), (get_package_paths('skimage')[1],"skimage"), ('./tasks.py', '.'), ('./alignment.py', '.'), ('./utils.py', '.'), ('./views.py', '.'), ('./app.py', '.')],
+             hiddenimports=['scipy.special.cython_special', 'tasks', 'skimage', 'pims', 'pims_nd2'],
+             hookspath=['.'],
              runtime_hooks=[],
              excludes=[],
              win_no_prefer_redirects=False,
@@ -21,12 +24,16 @@ pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 
 MISSING_DYLIBS = [
+    Path(find_library("libiomp5md")),
+    Path(find_library("vcruntime140")),
+    Path(find_library("msvcp140")),
     Path('C:\\Users\\david\\miniconda3\\Lib\\site-packages\\pims_nd2\\ND2SDK\\win\\nd2ReadSDK.h')
 ]
 
 nd2lib = glob('C:\\Users\\david\\miniconda3\\Lib\\site-packages\\pims_nd2\\ND2SDK\\win\\x64\\*')
 
 for lib in nd2lib:
+    print(lib)
     MISSING_DYLIBS.append(Path(lib))
 
 a.binaries += TOC([
@@ -37,7 +44,7 @@ exe = EXE(pyz,
           a.scripts,
           [],
           exclude_binaries=True,
-          name='main',
+          name='YeastMateIO',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
@@ -50,4 +57,4 @@ coll = COLLECT(exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='main')
+               name='YeastMateIO')

@@ -4,13 +4,13 @@ import json
 import requests
 import numpy as np
 
-import base64
 from io import BytesIO
 from PIL import Image
 
+from skimage.transform import rescale
 from skimage.exposure import rescale_intensity
 from skimage.io import imsave as skimsave
-from skimage.external.tifffile import imsave as tifimsave
+from tifffile import imwrite as tifimsave
 
 def get_align_channel_vars(channels):
     channels_cam1 = []
@@ -67,7 +67,7 @@ def parse_export_classes(array):
     return crop_classes, mask_classes, tags
 
 def enlarge_box(box, boxsize, height, width):
-    y1, x1, y2, x2 = map(int, box)
+    x1, y1, x2, y2 = map(int, box)
     boxsize = boxsize//2
 
     centerx = (x1 + x2) // 2
@@ -76,15 +76,18 @@ def enlarge_box(box, boxsize, height, width):
     centerx = min(max(0+boxsize, centerx), width-boxsize)
     centery = min(max(0+boxsize, centery), height-boxsize)
 
-    return centery-boxsize, centerx-boxsize, centery+boxsize, centerx+boxsize
+    return centerx-boxsize, centery-boxsize, centerx+boxsize, centery+boxsize
 
 
-def detect_one_image(image, zstack, graychannel, ip):
+def detect_one_image(image, zstack, graychannel, scale_factor, ip):
     if zstack:
-        image = np.max(image, axis=0)
+        image = image[image.shape[0]//2]
+        #image = np.max(image, axis=0)
 
     if len(image.shape) > 2:    
         image = image[graychannel,:,:]
+
+    image = rescale(image, scale_factor)
 
     image = np.expand_dims(image, axis=-1)
     image = np.repeat(image, 3, axis=-1)
@@ -101,24 +104,28 @@ def detect_one_image(image, zstack, graychannel, ip):
 
     result = requests.post("http://{}/predict".format(ip), files=imagedict).json()
 
-    mask = np.asarray(result['mask'])
-    meta = result['meta']
+    if scale_factor != 1:
+        for n, thing in enumerate(result['things']):
+           result['things'][n]['box'] = [x/scale_factor for x in thing['box']]
 
-    return mask, meta
+    return result
 
 
 def negate_boolean(b):
     return not b
 
 
-def crop_img(img, box, out_dir, filename, tag, index, video_split, mask):
+def crop_img(img, box, out_dir, filename, tag, index, meta, box_expansion, boxsize, video_split, mask):
     basename, extension = os.path.splitext(filename)
     name_ = basename + '_' + tag + '_' + str(index)
 
     if mask:
         name_ = name_ + '_mask'
 
-    x1, y1, x2, y2 = map(int, box)
+    if box_expansion:
+        x1, y1, x2, y2 = enlarge_box(box, boxsize, meta['height'], meta['width'])
+    else:
+        x1, y1, x2, y2 = map(int, box)
     
     if len(img.shape) == 4:
         if img.shape[1] < img.shape[-1]:

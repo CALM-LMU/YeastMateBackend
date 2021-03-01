@@ -6,7 +6,7 @@ from flask import render_template
 from flask import request, jsonify
 
 from app import app
-from tasks import start_pipeline, align_task, detect_task, export_task
+from tasks import start_pipeline, preprocessing_task, detect_task, export_task
 
 from app import huey
 
@@ -19,8 +19,8 @@ def add_execute_task(task):
 
     tasks = json.loads(huey.storage.peek_data('tasks'))
 
-    if task.name == 'align_task':
-        tasks[task.id+'align'] = {'Job': 'Alignment', 'Path': task.args[0], 'Status': 'Running'}
+    if task.name == 'preprocessing_task':
+        tasks[task.id+'preprocessing'] = {'Job': 'Preprocessing', 'Path': task.args[0], 'Status': 'Running'}
 
         if task.args[1]:
             tasks[task.id+'detect'] = {'Job': 'Detection', 'Path': task.args[0], 'Status': 'Pending'}
@@ -38,7 +38,7 @@ def remove_execute_task(task, task_value, exc):
     if task.name != 'start_pipeline':
         tasks = json.loads(huey.storage.peek_data('tasks'))
         try:
-            del tasks[task.id+'align']
+            del tasks[task.id+'preprocessing']
         except:
             pass
 
@@ -51,14 +51,7 @@ def remove_execute_task(task, task_value, exc):
 
 @app.route('/', methods=['POST'])
 def queue_job():
-    align = False
-    detect = False
-    if 'align' in request.json.keys():
-        align = True
-    if 'detect' in request.json.keys():
-        detect = True
-
-    pipeline = start_pipeline.s(align, detect, request.json['path'])
+    pipeline = start_pipeline.s()
     
     if 'preprocessing' in request.json.keys():
         path = os.path.join(request.json['path'])
@@ -67,34 +60,38 @@ def queue_job():
         channels = request.json['preprocessing']['channels'] 
         file_format = request.json['preprocessing']['inputFileFormat'] 
         dimensions = request.json['preprocessing']['dimensions']
+        video_split = request.json['preprocessing']['videoSplit']
 
-        pipeline = pipeline.then(align_task, path, detect, alignment, channels, file_format, dimensions)
+        pipeline = pipeline.then(preprocessing_task, path, alignment, channels, file_format, dimensions, video_split)
 
     if 'detection' in request.json.keys():
         path = os.path.join(request.json['path'])
+        
+        include_tag = request.json['includeTag']
+        exclude_tag = request.json['excludeTag']
 
         zstack = request.json['detection']['zstack']
         video = request.json['detection']['video']
-        graychannel = request.json['detection']['graychannel']
-        boxsize = request.json['detection']['boxsize']
-        box_expansion = request.json['detection']['boxExpansion']
+        graychannel = int(request.json['detection']['graychannel'])
+        scale_factor = float(request.json['detection']['scaleFactor'])
         frame_selection = request.json['detection']['frameSelection']
         ip = request.json['detection']['ip']
 
-        pipeline = pipeline.then(detect_task, path, zstack, graychannel, video, frame_selection, box_expansion, boxsize, ip)
+        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, graychannel, scale_factor, video, frame_selection, ip)
 
     if 'export' in request.json.keys():
         path = os.path.join(request.json['path'])
 
-
-        print(request.json)
-
         crop = request.json['export']['crop']
+        measure = request.json['export']['measure']
         classes = request.json['export']['classes']
+        video = request.json['export']['video']
         video_split = request.json['export']['videoSplit']
         score_threshold = float(request.json['export']['scoreThreshold'])
+        boxsize = int(request.json['export']['boxsize'])
+        box_expansion = request.json['export']['boxExpansion']
 
-        pipeline = pipeline.then(export_task, path, crop, classes, video_split, score_threshold)
+        pipeline = pipeline.then(export_task, path, measure, crop, classes, video, video_split, score_threshold, box_expansion, boxsize)
 
     huey.enqueue(pipeline)
 
@@ -108,15 +105,15 @@ def get_tasklist():
     for t in tasks:
         if t.name == 'start_pipeline':
             if t.args[0]:
-                job = 'Alignment'
+                job = 'Preprocessing'
                 tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
             
             if t.args[1]:
                 job = 'Detection'
                 tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
 
-        elif t.name == 'align_task':
-            job = 'Alignment'
+        elif t.name == 'preprocessing_task':
+            job = 'Preprocessing'
             tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
             
             if t.args[1]:
