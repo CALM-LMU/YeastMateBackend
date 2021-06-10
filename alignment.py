@@ -17,6 +17,7 @@ from skimage.feature import match_descriptors, ORB, plot_matches
 from skimage.transform import AffineTransform, EuclideanTransform
 
 from tifffile import imwrite as imsave
+from tifffile import memmap
 
 
 def align_orb_ransac_cv2(img1, img2, plot=False):
@@ -120,15 +121,24 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
         bundleax = 'c'
         if 'z' in reader.sizes.keys():
             bundleax += 'z'
+            z = reader.sizes['z']
+        else:
+            z = 1
+
         bundleax += 'yx'
 
         total = m * t
+
+        c = reader.sizes['c'] - len(remove_channels)
 
         reader.bundle_axes = bundleax
         reader.iter_axes = iterax
         
         # go through single images
-        timestack = []
+        h,ta = os.path.split(path)
+        filename = ta.rsplit('.',1)[0]
+        imagestack = memmap(os.path.join(out_dir, filename + series_suffix.format(1) + '.tif'), shape=(t, z, c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
+
         for idx, img in enumerate(reader):
             if alignment:
                 # get channels for alignment
@@ -147,27 +157,25 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
                     continue
             
             # collect all channels
-            imgs = []
+            res = []
             for ch, chimg in enumerate(img):  
                 img_ = chimg 
-                if alignment:
-                    # transform if channel belongs to camera 2
-                    if ch in channels_cam2 and ch != alignment_channel_cam2:
-                        img_ = transform_planewise(img_, model, reader.bundle_axes)
+                # transform if channel belongs to camera 2
+                if alignment and ch in channels_cam2 and ch != alignment_channel_cam2:
+                    img_ = transform_planewise(img_, model, reader.bundle_axes)
 
                 if ch not in remove_channels:        
-                    	imgs.append(img_)
+                    	res.append(img_)
             
             progress = (idx+1) / total * 100
             progress = progress / counter['total'] * (counter['idx']+1)
                 
-            # stack along axis 1 for ImageJ-compatible ZCXY output
+            # stack along axis 1 for ImageJ-compatible ZCYX output
             if 'z' in reader.bundle_axes:
-                res = np.stack(imgs, axis=1)
+                res = np.stack(res, axis=1)
             else:
-                res = np.stack(imgs, axis=0)
-
-            timestack.append(res)
+                res = np.stack(res, axis=0)
+                res = np.expand_dims(res, axis=1)
             
             folderidx = idx // t + 1
             fileidx = (idx - (folderidx-1) * t) + 1
@@ -184,11 +192,14 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
                             
                 # save as ImageJ-compatible tiff stack
                 imsave(outfile, res, imagej=True)
+
+            imagestack[idx - t * idx//t] = res
+            imagestack.flush()
       
             if (idx+1) % t == 0:
-                folderidx = idx // t + 1
-
-                res = np.asarray(timestack)
+                # Generate new tiff file
+            
+                folderidx = (idx+1) // t + 1
 
                 # get filename before suffix
                 h,ta = os.path.split(path)
@@ -196,11 +207,8 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
                 
                 # construct new filename
                 outfile = os.path.join(out_dir, filename + series_suffix.format(folderidx) + '.tif')
-                            
-                # save as ImageJ-compatible tiff stack
-                imsave(outfile, res, imagej=True)
 
-                timestack = []
+                imagestack = memmap(outfile, shape=(t, z, c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
     else:
         if alignment:          
