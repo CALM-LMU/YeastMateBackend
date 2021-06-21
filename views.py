@@ -51,7 +51,21 @@ def remove_execute_task(task, task_value, exc):
 
 @app.route('/', methods=['POST'])
 def queue_job():
-    pipeline = start_pipeline.s()
+    alignment  = False
+    detection = False
+    export = False
+
+    if 'preprocessing' in request.json.keys():
+        alignment = True
+        path = os.path.join(request.json['path'])
+    if 'detection' in request.json.keys():
+        detection = True
+        path = os.path.join(request.json['path'])
+    if 'export' in request.json.keys():
+        export = True
+        path = os.path.join(request.json['path'])
+
+    pipeline = start_pipeline.s(alignment, detection, export, path)
     
     if 'preprocessing' in request.json.keys():
         path = os.path.join(request.json['path'])
@@ -62,7 +76,7 @@ def queue_job():
         dimensions = request.json['preprocessing']['dimensions']
         video_split = request.json['preprocessing']['videoSplit']
 
-        pipeline = pipeline.then(preprocessing_task, path, alignment, channels, file_format, dimensions, video_split)
+        pipeline = pipeline.then(preprocessing_task, path, detection, export, alignment, channels, file_format, dimensions, video_split)
 
     if 'detection' in request.json.keys():
         path = os.path.join(request.json['path'])
@@ -77,7 +91,7 @@ def queue_job():
         frame_selection = request.json['detection']['frameSelection']
         ip = request.json['detection']['ip']
 
-        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, graychannel, scale_factor, video, frame_selection, ip)
+        pipeline = pipeline.then(detect_task, path, export, include_tag, exclude_tag, zstack, graychannel, scale_factor, video, frame_selection, ip)
 
     if 'export' in request.json.keys():
         path = os.path.join(request.json['path'])
@@ -111,8 +125,12 @@ def get_tasklist():
             if t.args[1]:
                 job = 'Detection'
                 tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
-
-        elif t.name == 'preprocessing_task':
+            
+            if t.args[2]:
+                job = 'Export'
+                tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
+  
+        if t.name == 'preprocessing_task':
             job = 'Preprocessing'
             tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
             
@@ -120,8 +138,20 @@ def get_tasklist():
                 job = 'Detection'
                 tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
 
+            if t.args[2]:
+                job = 'Export'
+                tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+
         elif t.name == 'detect_task':
             job = 'Detection'
+            tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+
+            if t.args[1]:
+                job = 'Export'
+                tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+
+        elif t.name == 'export_task':
+            job = 'Export'
             tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
 
         else:

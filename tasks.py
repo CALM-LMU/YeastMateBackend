@@ -20,12 +20,15 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 @huey.task()
-def start_pipeline():
+def start_pipeline(alignment, detection, export, path):
     return
 
 
 @huey.task()
-def preprocessing_task(path, alignment, channels, file_format, dimensions, video_split, series_suffix='_series{}'):
+def preprocessing_task(path, doDetection, doExport, alignment, channels, file_format, dimensions, video_split, series_suffix='_series{}'):
+    import time
+    time.sleep(30)
+
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
     tif_channels = get_align_dimension_vars(dimensions)
 
@@ -51,7 +54,7 @@ def preprocessing_task(path, alignment, channels, file_format, dimensions, video
 
 
 @huey.task()
-def detect_task(path, include_tag, exclude_tag, zstack, graychannel, scale_factor, video, frame_selection, ip):
+def detect_task(path, doExport, include_tag, exclude_tag, zstack, graychannel, scale_factor, video, frame_selection, ip):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
