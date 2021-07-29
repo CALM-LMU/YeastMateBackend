@@ -84,14 +84,14 @@ def detect_task(path, doExport, include_tag, exclude_tag, zstack, graychannel, s
             imagelist = [image]
             frame_detection = 'null'
 
-        resdict = {'image': os.path.basename(path)[-1], 'meta': {}, 'detection_frame': frame_detection, 'detections': []}
+        resdict = {'image': os.path.basename(path), 'meta': {}, 'detection_frame': frame_detection, 'detections': []}
 
         maskarray = []
         for n,img in enumerate(imagelist):
             res = detect_one_image(img, zstack, graychannel, scale_factor, ip)
 
-            resdict['detections'].append(res['things'])
-            mask = np.asarray(res["mask"]).reshape(res['height'], res['width'], res['channel'])
+            resdict['detections'] = res['things']
+            mask = np.asarray(res["mask"]).reshape(res['height'], res['width'])
 
             if scale_factor != 1:
                 mask = rescale(mask, (1/scale_factor, 1/scale_factor, 1))
@@ -100,8 +100,8 @@ def detect_task(path, doExport, include_tag, exclude_tag, zstack, graychannel, s
 
         maskarray = np.squeeze(np.asarray(maskarray))
         
-        resdict['meta']['height'] = res['height']
-        resdict['meta']['width'] = res['width']
+        resdict['meta']['height'] = imagelist[0].shape[0]
+        resdict['meta']['width'] = imagelist[0].shape[1]
 
         tifimsave(path.replace('.tif', '_mask.tif'), maskarray)
         with open(path.replace('.tif', '_detections.json'), 'w') as file:
@@ -109,7 +109,7 @@ def detect_task(path, doExport, include_tag, exclude_tag, zstack, graychannel, s
                 
 
 @huey.task()
-def export_task(path, measure, crop, classes, video, video_split, score_threshold, box_expansion, boxsize):
+def export_task(path, crop, classes, video, video_split, score_threshold, box_expansion, boxsize):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
@@ -144,111 +144,6 @@ def export_task(path, measure, crop, classes, video, video_split, score_threshol
 
         filename = os.path.basename(filepath.replace('_detections.json', '.tif'))
 
-        if measure:   
-            neongreen = tifimread(filepath.replace('TransCon_detections.json', '488nm.tif'))
-            if mask[:,:,-1].max() < 1:
-                continue
-            
-            scores = []
-            for th in metadict['detections']:
-                if th["class"] == 3:
-                    scores.append(th["score"])
-            
-            matings = regionprops(mask[:,:,-1])
-            
-            for n,mating in enumerate(matings):
-                if scores[n] < 1:
-                    continue 
-                    
-                mothercrop = mask[:,:,1][mating.bbox[0]:mating.bbox[2],mating.bbox[1]:mating.bbox[3]]
-                matingcrop = mask[:,:,-1][mating.bbox[0]:mating.bbox[2],mating.bbox[1]:mating.bbox[3]]
-                daughtercrop = mask[:,:,2][mating.bbox[0]:mating.bbox[2],mating.bbox[1]:mating.bbox[3]]
-                
-                mothers = regionprops(mothercrop)
-                daughters = regionprops(daughtercrop)
-            
-                if len(mothers) < 2:
-                    continue
-                
-                newmothers = []
-                for mot in mothers:
-                    if mot.area > 100:
-                        newmothers.append(mot)
-                        
-                mothers = newmothers
-                
-                if len(daughters) > 1:
-                    dscores = []          
-                    for daughter in daughters:
-                        for r in metadict['detections']:
-                            if r['id'] == daughter.label:
-                                dscores.append(r['score'])
-                                
-                    daughteridx = np.argmax(dscores)
-                    daughters = [daughters[daughteridx]]
-                    
-                while len(mothers) > 3:
-                    overlap = []
-                    for mot in mothers:
-                        overlap.append(np.sum(matingcrop[mothercrop == mot.label]))
-                        
-                    overlapidx = np.argmin(overlap)
-                    del mothers[overlapidx]
-                                
-                if len(daughters) == 1 and len(mothers) > 2:
-                    overlap = []
-                    for mot in mothers:
-                        overlap.append(np.sum(daughtercrop[mothercrop == mot.label]))
-                        
-                    overlapidx = np.argmax(overlap)
-                    del mothers[overlapidx]
-                    
-                if len(mothers) > 2:                 
-                    continue
-                
-                xses = []
-                yses = []
-                bses = []
-                cses = []
-                dses = []
-                means = []
-                maxes = []
-                for th in mothers:
-                    motherbox = neongreen[mating.bbox[0]:mating.bbox[2],mating.bbox[1]:mating.bbox[3]][th.bbox[0]:th.bbox[2],th.bbox[1]:th.bbox[3]]
-                    motherbox[mothercrop[th.bbox[0]:th.bbox[2],th.bbox[1]:th.bbox[3]] != th.label] = 0
-                    
-                    glcm = greycomatrix(motherbox, distances=[5], angles=[0], levels=neongreen.max()+1, symmetric=True, normed=True)
-                    xs = greycoprops(glcm, 'dissimilarity')
-                    ys = greycoprops(glcm, 'correlation')
-                    bs = greycoprops(glcm, 'contrast')
-                    cs = greycoprops(glcm, 'homogeneity')
-                    ds = greycoprops(glcm, 'ASM')
-                    
-                    xses.append(xs)
-                    yses.append(ys)
-                    bses.append(bs)
-                    cses.append(cs)
-                    dses.append(ds)
-                    means.append(np.mean(neongreen[mating.bbox[0]:mating.bbox[2],mating.bbox[1]:mating.bbox[3]][mothercrop == th.label]))
-                    maxes.append(np.max(neongreen[mating.bbox[0]:mating.bbox[2],mating.bbox[1]:mating.bbox[3]][mothercrop == th.label]))
-                
-                maxs = max(maxes)
-                for entry in metadict['detections']:
-                    if entry['id'] == mating.label:
-                        assert entry['class'] == 3
-                        entry['mean_distance'] = float(np.abs(means[0]-means[1]))
-                        entry['mean_distance_normed'] = float(np.abs(means[0]/maxs-means[1]/maxs))
-                        entry['dissimilarity'] = float(np.abs(xses[0]-xses[1]))
-                        entry['correlation'] = float(np.abs(yses[0]-yses[1]))
-                        entry['contrast'] = float(np.abs(bses[0]-bses[1]))
-                        entry['homogeneity'] = float(np.abs(cses[0]-cses[1]))
-                        entry['ASM'] = float(np.abs(dses[0]-dses[1]))
-
-            with open(filepath, 'w') as file:
-                print(filepath)
-                doc = json.dump(metadict, file, indent=1)
-                print(metadict)
-        
         if crop:
             for framekey, frame in enumerate(metadict['detections']):
                 for thing in frame:

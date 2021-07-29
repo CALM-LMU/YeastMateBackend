@@ -97,7 +97,6 @@ def queue_job():
         path = os.path.join(request.json['path'])
 
         crop = request.json['export']['crop']
-        measure = request.json['export']['measure']
         classes = request.json['export']['classes']
         video = request.json['export']['video']
         video_split = request.json['export']['videoSplit']
@@ -105,7 +104,7 @@ def queue_job():
         boxsize = int(request.json['export']['boxsize'])
         box_expansion = request.json['export']['boxExpansion']
 
-        pipeline = pipeline.then(export_task, path, measure, crop, classes, video, video_split, score_threshold, box_expansion, boxsize)
+        pipeline = pipeline.then(export_task, path, crop, classes, video, video_split, score_threshold, box_expansion, boxsize)
 
     huey.enqueue(pipeline)
 

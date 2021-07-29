@@ -82,18 +82,11 @@ def enlarge_box(box, boxsize, height, width):
 def detect_one_image(image, zstack, graychannel, scale_factor, ip):
     if zstack:
         image = image[image.shape[0]//2]
-        #image = np.max(image, axis=0)
 
     if len(image.shape) > 2:    
         image = image[graychannel,:,:]
 
     image = rescale(image, scale_factor)
-
-    image = np.expand_dims(image, axis=-1)
-    image = np.repeat(image, 3, axis=-1)
-
-    image = rescale_intensity(image, out_range=(0,255))
-    image = image.astype(np.uint8)
     
     image = Image.fromarray(image)
     
