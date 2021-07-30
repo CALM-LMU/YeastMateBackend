@@ -51,51 +51,35 @@ def remove_execute_task(task, task_value, exc):
 
 @app.route('/', methods=['POST'])
 def queue_job():
-    alignment  = False
-    detection = False
-    export = False
 
-    if 'preprocessing' in request.json.keys():
-        alignment = True
-        path = os.path.join(request.json['path'])
-    if 'detection' in request.json.keys():
-        detection = True
-        path = os.path.join(request.json['path'])
-    if 'export' in request.json.keys():
-        export = True
-        path = os.path.join(request.json['path'])
-
-    pipeline = start_pipeline.s(alignment, detection, export, path)
+    path = os.path.join(request.json['path'])
+    pipeline = start_pipeline.s()
     
     if 'preprocessing' in request.json.keys():
-        path = os.path.join(request.json['path'])
-
         alignment = request.json['preprocessing']['alignment']
         channels = request.json['preprocessing']['channels'] 
         file_format = request.json['preprocessing']['inputFileFormat'] 
         dimensions = request.json['preprocessing']['dimensions']
         video_split = request.json['preprocessing']['videoSplit']
 
-        pipeline = pipeline.then(preprocessing_task, path, detection, export, alignment, channels, file_format, dimensions, video_split)
+        pipeline = pipeline.then(preprocessing_task, path, alignment, channels, file_format, dimensions, video_split)
 
-    if 'detection' in request.json.keys():
-        path = os.path.join(request.json['path'])
-        
+    if 'detection' in request.json.keys():      
         include_tag = request.json['includeTag']
         exclude_tag = request.json['excludeTag']
 
         zstack = request.json['detection']['zstack']
         video = request.json['detection']['video']
         graychannel = int(request.json['detection']['graychannel'])
-        scale_factor = float(request.json['detection']['scaleFactor'])
+        pixel_size = float(request.json['detection']['pixelSize'])
+        lower_quantile = float(request.json['detection']['lowerQuantile'])
+        upper_quantile = float(request.json['detection']['upperQuantile'])
         frame_selection = request.json['detection']['frameSelection']
         ip = request.json['detection']['ip']
 
-        pipeline = pipeline.then(detect_task, path, export, include_tag, exclude_tag, zstack, graychannel, scale_factor, video, frame_selection, ip)
+        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, graychannel, lower_quantile, upper_quantile, pixel_size, video, frame_selection, ip)
 
     if 'export' in request.json.keys():
-        path = os.path.join(request.json['path'])
-
         crop = request.json['export']['crop']
         classes = request.json['export']['classes']
         video = request.json['export']['video']

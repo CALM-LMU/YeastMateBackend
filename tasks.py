@@ -12,23 +12,22 @@ from tifffile import imwrite as tifimsave
 
 from app import huey
 
-from alignment import *
-from utils import *
+from alignment import process_single_file
+from utils import get_align_channel_vars, get_align_dimension_vars, crop_img, parse_export_classes
+from detection import detect_one_image
+from config import reference_pixel_size
            
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
 
 @huey.task()
-def start_pipeline(alignment, detection, export, path):
+def start_pipeline():
     return
 
 
 @huey.task()
-def preprocessing_task(path, doDetection, doExport, alignment, channels, file_format, dimensions, video_split, series_suffix='_series{}'):
-    import time
-    time.sleep(30)
-
+def preprocessing_task(path, alignment, channels, file_format, dimensions, video_split, series_suffix='_series{}'):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
     tif_channels = get_align_dimension_vars(dimensions)
 
@@ -54,7 +53,7 @@ def preprocessing_task(path, doDetection, doExport, alignment, channels, file_fo
 
 
 @huey.task()
-def detect_task(path, doExport, include_tag, exclude_tag, zstack, graychannel, scale_factor, video, frame_selection, ip):
+def detect_task(path, include_tag, exclude_tag, zstack, graychannel, lower_quantile, upper_quantile, pixel_size, video, frame_selection, ip):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
@@ -88,13 +87,9 @@ def detect_task(path, doExport, include_tag, exclude_tag, zstack, graychannel, s
 
         maskarray = []
         for n,img in enumerate(imagelist):
-            res = detect_one_image(img, zstack, graychannel, scale_factor, ip)
+            things, mask = detect_one_image(img, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, ip, ref_pixel_size=reference_pixel_size)
 
-            resdict['detections'] = res['things']
-            mask = np.asarray(res["mask"]).reshape(res['height'], res['width'])
-
-            if scale_factor != 1:
-                mask = rescale(mask, (1/scale_factor, 1/scale_factor, 1))
+            resdict['detections'] = things
 
             maskarray.append(mask)
 
@@ -120,7 +115,7 @@ def export_task(path, crop, classes, video, video_split, score_threshold, box_ex
     crop_classes, mask_classes, tags = parse_export_classes(classes)
 
     if crop:
-        if not measure and len(crop_classes) == 0 and len(mask_classes) == 0:
+        if len(crop_classes) == 0 and len(mask_classes) == 0:
             return
     
         out_dir = os.path.join(path, 'crops')

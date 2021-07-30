@@ -1,14 +1,7 @@
 import os
 import copy
-import json
-import requests
 import numpy as np
 
-from io import BytesIO
-from PIL import Image
-
-from skimage.transform import rescale
-from skimage.exposure import rescale_intensity
 from skimage.io import imsave as skimsave
 from tifffile import imwrite as tifimsave
 
@@ -77,31 +70,6 @@ def enlarge_box(box, boxsize, height, width):
     centery = min(max(0+boxsize, centery), height-boxsize)
 
     return centerx-boxsize, centery-boxsize, centerx+boxsize, centery+boxsize
-
-
-def detect_one_image(image, zstack, graychannel, scale_factor, ip):
-    if zstack:
-        image = image[image.shape[0]//2]
-
-    if len(image.shape) > 2:    
-        image = image[graychannel,:,:]
-
-    image = rescale(image, scale_factor)
-    
-    image = Image.fromarray(image)
-    
-    imagebytes = BytesIO()
-    image.save(imagebytes, format="PNG")
-    imagebytes.seek(0)
-    imagedict = {"image": ('image.png', imagebytes, 'image/png')}
-
-    result = requests.post("http://{}/predict".format(ip), files=imagedict).json()
-
-    if scale_factor != 1:
-        for n, thing in enumerate(result['things']):
-           result['things'][n]['box'] = [x/scale_factor for x in thing['box']]
-
-    return result
 
 
 def negate_boolean(b):
