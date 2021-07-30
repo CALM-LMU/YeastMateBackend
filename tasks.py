@@ -77,13 +77,11 @@ def detect_task(path, include_tag, exclude_tag, zstack, graychannel, lower_quant
                 imagelist = [image[0]]
             elif frame_selection == 'all':
                 imagelist = image
-
-            frame_detection = frame_selection
         else:
             imagelist = [image]
-            frame_detection = 'null'
+            frame_selection = 'null'
 
-        resdict = {'image': os.path.basename(path), 'meta': {}, 'detection_frame': frame_detection, 'detections': []}
+        resdict = {'image': os.path.basename(path), 'metadata': {}, 'detections': []}
 
         maskarray = []
         for n,img in enumerate(imagelist):
@@ -95,8 +93,9 @@ def detect_task(path, include_tag, exclude_tag, zstack, graychannel, lower_quant
 
         maskarray = np.squeeze(np.asarray(maskarray))
         
-        resdict['meta']['height'] = imagelist[0].shape[0]
-        resdict['meta']['width'] = imagelist[0].shape[1]
+        resdict['metadata']['height'] = imagelist[0].shape[0]
+        resdict['metadata']['width'] = imagelist[0].shape[1]
+        resdict['metadata']['detection_frame'] = frame_selection
 
         tifimsave(path.replace('.tif', '_mask.tif'), maskarray)
         with open(path.replace('.tif', '_detections.json'), 'w') as file:
