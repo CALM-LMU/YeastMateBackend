@@ -96,6 +96,8 @@ def detect_task(path, include_tag, exclude_tag, zstack, graychannel, lower_quant
         resdict['metadata']['height'] = imagelist[0].shape[0]
         resdict['metadata']['width'] = imagelist[0].shape[1]
         resdict['metadata']['detection_frame'] = frame_selection
+        resdict['metadata']['source'] = 'Detection'
+        resdict['metadata']['bbox_format'] = 'x1y1x2y2'
 
         tifimsave(path.replace('.tif', '_mask.tif'), maskarray)
         with open(path.replace('.tif', '_detections.json'), 'w') as file:
