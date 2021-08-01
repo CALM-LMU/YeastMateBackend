@@ -5,8 +5,6 @@ import base64
 from io import BytesIO
 from PIL import Image
 
-from time import time
-
 from skimage.io import imsave
 
 from skimage.transform import rescale
