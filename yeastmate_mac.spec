@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
 from ctypes.util import find_library
 from pathlib import Path
 from glob import glob
@@ -8,17 +9,24 @@ from PyInstaller.utils.hooks import get_package_paths
 
 block_cipher = None
 
+package_path = get_package_paths('skimage')[1].split('/')
+dynload_path = os.path.join(*package_path[:-2])
+dynload_path = os.path.join(dynload_path, 'lib-dynload')
+dynload_path = '/' + dynload_path
+
 napari = Analysis(['annotation.py'],
              pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
              binaries=[],
              datas=[(get_package_paths('dask')[1],"dask"), \
                 (get_package_paths('skimage')[1],"skimage"), \
                 (get_package_paths('vispy')[1],"vispy"),\
-                (get_package_paths('napari')[1],"napari")
+                (get_package_paths('scipy')[1],"scipy"), \
+                (get_package_paths('napari')[1],"napari"), \
+                (dynload_path, "lib-dynload") 
                 ],
-             hiddenimports=['scipy.special.cython_special', 'skimage', \
+             hiddenimports=['skimage', \
                 "vispy.ext._bundled.siz", "vispy.app.backends._pyqt5", \
-                "napari", "PyQt5"
+                "napari", "PyQt5", "binascii"
                 ],
              hookspath=[],
              hooksconfig={},
