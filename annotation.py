@@ -205,7 +205,7 @@ def get_imported_layers(dic, mask, score_thresholds):
 
     return layers
 
-def get_new_layers(dic):
+def get_new_layers():
     # Default 2 (mating, budding) layers
     layers = {1: [], 2:[]}
 
@@ -236,7 +236,7 @@ def label_image():
         layers = get_imported_layers(dic, mask, score_thresholds)  
     except:
         # Convert settings from GUI to Napari layers
-        layers = get_new_layers(dic)
+        layers = get_new_layers()
         print('no json file found!')
 
     # Add Napari layers to viewer  
