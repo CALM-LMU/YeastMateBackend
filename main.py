@@ -1,3 +1,4 @@
+import sys
 import logging
 
 from huey.consumer import Consumer
@@ -22,16 +23,18 @@ def consumer_main():
     consumer = huey.create_consumer(workers=1, periodic=False, backoff=1)
     consumer.run()
 
-def start_server(port=11001):
-    try:
-        app.run(host='0.0.0.0', port=port)
-    except:
-        start_server(port=port+1)
-
-
 if __name__ == '__main__':
+    # Parse arguments from Electron frontend.
+    parser = argparse.ArgumentParser()
+    parser.add_argument('port', type=str, help='Port to serve backend on.')
+    args = parser.parse_args()
+
+    port = int(args.port)
+
+    # Freeze and start huey worker
     freeze_support()
     proc = Process(target=consumer_main)
     proc.start()
 
-    start_server(port=11001)
+    # Start flask server
+    app.run(host='0.0.0.0', port=port)
