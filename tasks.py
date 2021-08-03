@@ -53,7 +53,7 @@ def preprocessing_task(path, alignment, channels, file_format, dimensions, video
 
 
 @huey.task()
-def detect_task(path, include_tag, exclude_tag, zstack, graychannel, lower_quantile, upper_quantile, pixel_size, video, frame_selection, ip):
+def detect_task(path, include_tag, exclude_tag, zstack, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
@@ -85,7 +85,7 @@ def detect_task(path, include_tag, exclude_tag, zstack, graychannel, lower_quant
 
         maskarray = []
         for n,img in enumerate(imagelist):
-            things, mask = detect_one_image(img, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, ip, ref_pixel_size=reference_pixel_size)
+            things, mask = detect_one_image(img, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, score_thresholds, ip, ref_pixel_size=reference_pixel_size)
 
             resdict['detections'] = things
 

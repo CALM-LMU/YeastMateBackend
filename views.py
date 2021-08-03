@@ -75,9 +75,10 @@ def queue_job():
         lower_quantile = float(request.json['detection']['lowerQuantile'])
         upper_quantile = float(request.json['detection']['upperQuantile'])
         frame_selection = request.json['detection']['frameSelection']
+        score_thresholds = request.json['detection']['scoreThresholds']
         ip = request.json['detection']['ip']
 
-        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, graychannel, lower_quantile, upper_quantile, pixel_size, video, frame_selection, ip)
+        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip)
 
     if 'export' in request.json.keys():
         crop = request.json['export']['crop']

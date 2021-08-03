@@ -57,7 +57,7 @@ def preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, 
 
     return image
 
-def detect_one_image(image, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, ip, ref_pixel_size=110):
+def detect_one_image(image, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, score_thresholds, ip, ref_pixel_size=110):
     image = preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, ref_pixel_size=110)
     
     image = image.astype(np.float32)
@@ -66,9 +66,14 @@ def detect_one_image(image, lower_quantile, upper_quantile, pixel_size, zstack, 
     imagebytes = BytesIO()
     image.save(imagebytes, format="TIFF")
     imagebytes.seek(0)
-    imagedict = {"image": ('image.tiff', imagebytes, 'image/tiff')}
 
-    result = requests.post("http://{}/predict".format(ip), files=imagedict).json()
+    score_bytes = json.dumps(score_thresholds).encode('utf-8')
+
+    filedict = {"image": ('image.tiff', imagebytes, 'image/tiff') , \
+                    "annotations": ('score_thresholds.json', score_bytes)
+                }
+
+    result = requests.post("http://{}/predict".format(ip), files=filedict).json()
 
     things = result['things']
    
