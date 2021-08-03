@@ -236,20 +236,26 @@ def label_image():
     try:
         mask = imread(imglist[counter].replace('.tif', '_mask.tif'))
         mask = mask.astype(np.uint16)
+        imported_mask = True
     except:
         mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint16)
+        imported_mask = False
         print('no mask found')
     
-    try:
-        with open(imglist[counter].replace('.tif', '_detections.json'), 'r') as file:
-            dic = json.load(file)
+    if imported_mask:
+        try:
+            with open(imglist[counter].replace('.tif', '_detections.json'), 'r') as file:
+                dic = json.load(file)
 
-        # Convert objects in detections.json to Napari layers
-        layers = get_imported_layers(dic, mask, score_thresholds)  
-    except:
-        # Convert settings from GUI to Napari layers
+            # Convert objects in detections.json to Napari layers
+            layers = get_imported_layers(dic, mask, score_thresholds)  
+        except:
+            # Convert settings from GUI to Napari layers
+            layers = get_new_layers()
+            print('no json file found!')
+    else:
+        print('thus skipping loading json annotations')
         layers = get_new_layers()
-        print('no json file found!')
 
     # Add Napari layers to viewer  
 
