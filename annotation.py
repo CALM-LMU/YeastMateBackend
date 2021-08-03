@@ -171,12 +171,24 @@ def get_imported_layers(dic, mask, score_thresholds):
         if thing['score'] < score_thresholds[thing['class']]: continue
         
         # Add class layers
+        class_counter = class_idx
         while True:
             try:
                 _ = layers[class_idx]
                 break
             except KeyError:
                 layers[class_idx] = []
+
+                while True:
+                    class_counter -= 1
+
+                    if class_counter == 0: break
+
+                    try:
+                        _ = layers[class_counter]
+                    except KeyError:
+                        layers[class_counter] = []
+
 
         # Add linked objects to their layer.
         links = []
@@ -244,7 +256,9 @@ def label_image():
     viewer.add_image(image)    
     viewer.add_labels(mask[:,:], opacity=0.3, name='single cell', visible=True)
         
-    for n, things in enumerate(list(layers.values())):
+    for n in range(len(list(layers.keys()))):
+        things = layers[n+1]
+
         if not things:
             things = None
 
