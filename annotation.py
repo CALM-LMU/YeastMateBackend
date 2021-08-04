@@ -24,7 +24,7 @@ def set_hotkeys():
         next_image()
 
 def get_imglist(path):
-    imglist = glob(os.path.join(path, '*.tif'))
+    imglist = glob(os.path.join(path, '*.tif')) + glob(os.path.join(path, '*.tiff'))
     imglist = [x for x in imglist if not 'mask' in x]
     imglist = sorted(imglist, key=lambda f: [int(n) for n in re.findall(r"\d+", f)])
         
@@ -139,9 +139,17 @@ def save_labels():
     res = {'image':imagename, 'metadata':metadata, 'detections':things}
 
     # Save results
-    imsave(imglist[counter].replace('.tif', '_mask.tif'), mask)
-    with open(imglist[counter].replace('.tif', '_detections.json'), 'w') as file:
-        json.dump(res, file, indent=1)
+    if 'tiff' in imglist[counter]:
+        imsave(imglist[counter].replace('.tiff', '_mask.tiff'), mask)
+
+        with open(imglist[counter].replace('.tiff', '_detections.json'), 'w') as file:
+            json.dump(res, file, indent=1)
+    
+    else:
+        imsave(imglist[counter].replace('.tif', '_mask.tif'), mask)
+
+        with open(imglist[counter].replace('.tif', '_detections.json'), 'w') as file:
+            json.dump(res, file, indent=1)   
 
 def get_imported_layers(dic, mask, score_thresholds):
 
@@ -240,9 +248,22 @@ def label_image():
     image = imread(imglist[counter])
         
     try:
-        mask = imread(imglist[counter].replace('.tif', '_mask.tif'))
+
+        if 'tiff' in imglist[counter]:
+            try:
+                mask = imread(imglist[counter].replace('.tiff', '_mask.tiff'))
+            except:
+                mask = imread(imglist[counter].replace('.tiff', '_mask.tif'))
+
+        else:
+            try:
+                mask = imread(imglist[counter].replace('.tif', '_mask.tif'))
+            except:
+                mask = imread(imglist[counter].replace('.tif', '_mask.tiff'))
+
         mask = mask.astype(np.uint16)
         imported_mask = True
+
     except:
         mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint16)
         imported_mask = False
@@ -250,7 +271,7 @@ def label_image():
     
     if imported_mask:
         try:
-            with open(imglist[counter].replace('.tif', '_detections.json'), 'r') as file:
+            with open(imglist[counter].replace('.tiff', '_detections.json').replace('.tif', '_detections.json'), 'r') as file:
                 dic = json.load(file)
 
             # Convert objects in detections.json to Napari layers
