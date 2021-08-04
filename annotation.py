@@ -139,7 +139,7 @@ def save_labels():
     res = {'image':imagename, 'metadata':metadata, 'detections':things}
 
     # Save results
-    if 'tiff' in imglist[counter]:
+    if imglist[counter].endswith('tiff'):
         imsave(imglist[counter].replace('.tiff', '_mask.tiff'), mask)
 
         with open(imglist[counter].replace('.tiff', '_detections.json'), 'w') as file:
@@ -248,8 +248,7 @@ def label_image():
     image = imread(imglist[counter])
         
     try:
-
-        if 'tiff' in imglist[counter]:
+        if imglist[counter].endswith('tiff'):
             try:
                 mask = imread(imglist[counter].replace('.tiff', '_mask.tiff'))
             except:
@@ -271,7 +270,12 @@ def label_image():
     
     if imported_mask:
         try:
-            with open(imglist[counter].replace('.tiff', '_detections.json').replace('.tif', '_detections.json'), 'r') as file:
+            if imglist[counter].endswith('tiff'):
+               fileend = '.tiff'
+            else:
+                fileend = '.tif'
+                
+            with open(imglist[counter].replace(fileend, '_detections.json'), 'r') as file:
                 dic = json.load(file)
 
             # Convert objects in detections.json to Napari layers
@@ -300,7 +304,7 @@ def label_image():
         except IndexError:
             name = 'Class {}'.format(n+1)
 
-        viewer.add_shapes(things, shape_type='path', edge_width=5, opacity=0.5, name=name, visible=True)
+        viewer.add_shapes(things, shape_type='path', edge_width=5, opacity=0.5, edge_color='red', face_color='red', name=name, visible=True)
             
     viewer.layers.selection.active = viewer.layers[-1]
     
