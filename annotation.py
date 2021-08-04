@@ -69,8 +69,9 @@ def save_labels():
 
     for obj in single_objects:
         bbox = [obj.bbox[1],obj.bbox[0],obj.bbox[3],obj.bbox[2]]
+        bbox = [int(x) for x in bbox]
 
-        things[obj.label] = {'id': obj.label, 'box':bbox, 'class': str(0), 'score': 1.0, 'links': None}
+        things[str(obj.label)] = {'id': obj.label, 'box':bbox, 'class': [str(0)], 'score': [1.0], 'links': []}
 
     maxcounter = max(list(rp_dict.keys())) + 2
 
@@ -81,7 +82,6 @@ def save_labels():
 
         for sample in data:
             new_mask = np.zeros_like(mask, np.uint8)
-            ### Directly cast to int?? need to test
             samplelist = [list(x) for x in list(sample)]
 
             # Get ID of main class
@@ -92,9 +92,6 @@ def save_labels():
             subobject_ids = []
             for n,point in enumerate(samplelist):
                 sub_ids = mask[int(point[0]), int(point[1])]
-                
-                obj = rp_dict[sub_ids]
-                bbox = [obj.bbox[1],obj.bbox[0],obj.bbox[3],obj.bbox[2]]
 
                 # This is hardcoded for our yeast subclassification system
                 if class_idx == 0:
@@ -109,7 +106,13 @@ def save_labels():
                         subclass_idx = 2
 
                 fullclass_idx = "{}.{}".format(class_idx+1, subclass_idx)
-                things[str(sub_ids)] = {'id': str(sub_ids), 'box':bbox, 'class': fullclass_idx, 'score': 1.0, 'links': [str(main_ids)]}
+
+                try:
+                    things[str(sub_ids)]['class'].append(fullclass_idx)
+                    things[str(sub_ids)]['score'].append(1.0)
+                    things[str(sub_ids)]['links'].append(str(main_ids))
+                except KeyError:
+                    raise KeyError('All points must be within a masked object!')
 
                 subobject_ids.append(str(sub_ids))
 
@@ -119,8 +122,9 @@ def save_labels():
             obj = regionprops(new_mask)[0]
 
             bbox = [obj.bbox[1],obj.bbox[0],obj.bbox[3],obj.bbox[2]]
+            bbox = [int(x) for x in bbox]
 
-            things[str(main_ids)] = {'id': str(main_ids), 'box': bbox, 'class': str(class_idx+1), 'score': 1.0, 'links': subobject_ids}
+            things[str(main_ids)] = {'id': str(main_ids), 'box': bbox, 'class': [str(class_idx+1)], 'score': [1.0], 'links': subobject_ids}
 
     # Generate results dictionary
     imagename = os.path.basename(imglist[counter])
@@ -151,24 +155,24 @@ def get_imported_layers(dic, mask, score_thresholds):
     for rp in rp_objs:
         rp_dict[rp.label] = rp
 
-    for thing in list(dic['detections'].values()):
+    for key, thing in dic['detections'].items():
 
         # Split class string into main and subclass (and account for .0 edge case).
         try:
-            subclass_idx = int(thing['class'].split('.')[1])
+            subclass_idx = int(thing['class'][0].split('.')[1])
 
             if subclass_idx > 0: continue
 
-            class_idx = int(thing['class'].split('.')[0])
+            class_idx = int(thing['class'][0].split('.')[0])
 
         except IndexError:
-            class_idx = int(thing['class'].split('.')[0])
+            class_idx = int(thing['class'][0].split('.')[0])
 
         # No extra annotation layer for single cell (besides mask).
         if class_idx == 0: continue
 
         # Skip objects with score < threshold.
-        if thing['score'] < score_thresholds[thing['class']]: continue
+        if thing['score'][0] < score_thresholds[str(class_idx)]: continue
         
         # Add class layers
         class_counter = class_idx
@@ -192,10 +196,12 @@ def get_imported_layers(dic, mask, score_thresholds):
 
         # Add linked objects to their layer.
         links = []
-        for link in thing['links']:
+        for n,link in enumerate(thing['links']):
             obj = dic['detections'][link]
-            
-            subclass_idx = int(obj['class'].split('.')[1])
+
+            for m, uplink in enumerate(obj['links']):
+                if uplink == key:
+                    subclass_idx = int(obj['class'][m+1].split('.')[1])
 
             # Add array for each subclass
             while True:
