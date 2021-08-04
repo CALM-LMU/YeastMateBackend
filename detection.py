@@ -42,9 +42,9 @@ def unscale_things(things, pixel_size, ref_pixel_size=110):
 
     return things
 
-def preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, ref_pixel_size=110):
+def preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, zslice, graychannel, ref_pixel_size=110):
     if zstack:
-        image = image[image.shape[0]//2]
+        image = image[int(image.shape[0]*zslice)]
 
     if len(image.shape) > 2:    
         image = image[graychannel,:,:]
@@ -57,8 +57,8 @@ def preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, 
 
     return image
 
-def detect_one_image(image, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, score_thresholds, ip, ref_pixel_size=110):
-    image = preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, graychannel, ref_pixel_size=110)
+def detect_one_image(image, lower_quantile, upper_quantile, pixel_size, zstack, zslice, graychannel, score_thresholds, ip, ref_pixel_size=110):
+    image = preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, zslice, graychannel, ref_pixel_size=110)
     
     image = image.astype(np.float32)
     image = Image.fromarray(image, mode='F')

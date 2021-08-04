@@ -45,19 +45,33 @@ def get_align_dimension_vars(dimensions):
 
 def parse_export_classes(array):
     crop_classes = []
-    mask_classes = []
 
     tags = {}
     for cls in array:
         if cls['Crop'] == 'True':
-            crop_classes.append(int(cls['Class ID']) - 1)
+            crop_classes.append(int(cls['Class ID']))
 
-        if cls['Mask'] == 'True':
-            mask_classes.append(int(cls['Class ID']) - 1)
+        val_tag = cls['Tag']
 
-        tags[int(cls['Class ID']) - 1] = cls['Tag']
+        val_tag = val_tag.replace(" ", "_")
+        val_tag = lower(val_tag)
 
-    return crop_classes, mask_classes, tags
+        tags[int(cls['Class ID'])] = val_tag
+
+    return crop_classes, tags
+
+def get_class_indices(key, dic):
+    class_indices = {}
+    for n,link in enumerate(thing['links']):
+        obj = dic['detections'][link]
+
+        for m, uplink in enumerate(obj['links']):
+            if uplink == key:
+                subclass_idx = int(obj['class'][m+1].split('.')[1])
+
+        class_indices[link] = subclass_idx
+
+    return class_indices
 
 def enlarge_box(box, boxsize, height, width):
     x1, y1, x2, y2 = map(int, box)
@@ -71,59 +85,65 @@ def enlarge_box(box, boxsize, height, width):
 
     return centerx-boxsize, centery-boxsize, centerx+boxsize, centery+boxsize
 
+def scale_box(box, boxscale, height, width):
+    x1, y1, x2, y2 = map(int, box)
+
+    boxsize_x = x2 - x1
+    boxsize_y = y2 - y1
+
+    boxsize_x *= boxscale
+    boxsize_y *= boxscale
+
+    centerx = (x1 + x2) // 2
+    centery = (y1 + y2) // 2
+
+    centerx = min(max(0+boxsize_x, centerx), width-boxsize_x)
+    centery = min(max(0+boxsize_y, centery), height-boxsize_y)
+
+    return centerx-boxsize_x, centery-boxsize_y, centerx+boxsize_x, centery+boxsize_y
 
 def negate_boolean(b):
     return not b
 
 
-def crop_img(img, box, out_dir, filename, tag, index, meta, box_expansion, boxsize, video_split, mask):
+def crop_img(img, box, out_dir, filename, tag, index, cls_indices, meta, box_expansion, boxsize, boxscale_switch, boxscale, mask, tiff=False):
     basename, extension = os.path.splitext(filename)
     name_ = basename + '_' + tag + '_' + str(index)
+
+    if tiff:
+        suffix = '.tiff'
+    else:
+        suffix = '.tif'
 
     if mask:
         name_ = name_ + '_mask'
 
     if box_expansion:
         x1, y1, x2, y2 = enlarge_box(box, boxsize, meta['height'], meta['width'])
+    elif boxscale_switch
+        x1, y1, x2, y2 = scale_box(box, boxscale, meta['height'], meta['width'])
     else:
         x1, y1, x2, y2 = map(int, box)
     
     if len(img.shape) == 4:
-        if img.shape[1] < img.shape[-1]:
-            new_im = img[:,:,y1:y2,x1:x2]
-        else:
-            new_im = img[:,y1:y2,x1:x2,:]
+        new_im = img[:,:,y1:y2,x1:x2]
     elif len(img.shape) == 3:
-        if img.shape[0] < img.shape[-1]:
-            new_im = img[:,y1:y2,x1:x2]
-        else:
-            new_im = img[y1:y2,x1:x2,:]
+        new_im = img[:,y1:y2,x1:x2]
     elif len(img.shape) == 2:
         new_im = img[y1:y2,x1:x2]
     elif len(img.shape) == 5:
-        if img.shape[2] < img.shape[-1]:
-            new_im = img[:,:,:,y1:y2,x1:x2]
-        else:
-            new_im = img[:,:,y1:y2,x1:x2,:]
+        new_im = img[:,:,:,y1:y2,x1:x2]
+
     else:
         print('Not supported image shape!')
         return
 
     if mask:
-        new_im = copy.deepcopy(new_im)
-        new_im[new_im != int(index)] = 0
-        new_im[new_im > 0] = 1
+        new_mask = np.zeros_like(new_im)
+
+        for idx, cls_idx in cls_indices:
+            new_mask[new_im == int(idx)] = cls_idx
+        
         new_im = new_im.astype(np.uint8)
 
-    if video_split:
-        if not os.path.exists(os.path.join(out_dir, name_ + '_single_frames')):
-            os.makedirs(os.path.join(out_dir, name_ + '_single_frames'))
-
-        for fileidx in range(new_im.shape[0]):
-            # construct new filename
-            outfile = os.path.join(out_dir, name_ + '_single_frames', name_ + '_slice{}'.format(fileidx) + '.tif')
-                        
-            # save as ImageJ-compatible tiff stack
-            tifimsave(outfile, new_im[fileidx], imagej=negate_boolean(mask))
-    else:
-        tifimsave(os.path.join(out_dir, name_ + '.tif'), new_im, imagej=negate_boolean(mask))
+    tifimsave(os.path.join(out_dir, name_ + suffix), new_im, imagej=negate_boolean(mask))
