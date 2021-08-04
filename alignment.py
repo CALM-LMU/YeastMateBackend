@@ -93,7 +93,7 @@ def transform_planewise(img, model, axes):
     return img_t
 
 
-def process_single_file(counter, path, out_dir, alignment, video_split, file_format='.nd2', tif_channels=None, remove_channels=None, series_suffix='_series{}',
+def process_single_file(path, out_dir, alignment, video_split, file_format='.nd2', tif_channels=None, remove_channels=None, series_suffix='_series{}',
                         channels_cam1=(0,2), channels_cam2=(1,3),
                         alignment_channel_cam1=0,           
                         alignment_channel_cam2=1):
@@ -126,8 +126,6 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
             z = 1
 
         bundleax += 'yx'
-
-        total = m * t
 
         c = reader.sizes['c'] - len(remove_channels)
 
@@ -166,9 +164,6 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
 
                 if ch not in remove_channels:        
                     	res.append(img_)
-            
-            progress = (idx+1) / total * 100
-            progress = progress / counter['total'] * (counter['idx']+1)
                 
             # stack along axis 1 for ImageJ-compatible ZCYX output
             if 'z' in reader.bundle_axes:
@@ -282,9 +277,6 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
                     if remove_channels is not None:
                         res = np.delete(res, remove_channels, axis=1)
 
-                    progress = (idf+1)*(idt+1) / total * 100
-                    progress = progress / counter['total'] * (counter['idx']+1)
-
                     if video_split:
                         # get filename before suffix
                         h,ta = os.path.split(path)
@@ -294,8 +286,11 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
                             os.makedirs(os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames'))
                         
                         # construct new filename
-                        outfile = os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames', filename + series_suffix.format(idf) + '_slice{}'.format(idt) + '.tif')
-                                        
+                        if path.endswith('tiff'):
+                            outfile = os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames', filename + series_suffix.format(idf) + '_slice{}'.format(idt) + '.tiff')
+                        else:
+                            outfile = os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames', filename + series_suffix.format(idf) + '_slice{}'.format(idt) + '.tif')           
+                        
                         # save as ImageJ-compatible tiff stack
                         imsave(outfile, res, imagej=True)
 
@@ -308,7 +303,10 @@ def process_single_file(counter, path, out_dir, alignment, video_split, file_for
                 filename = ta.rsplit('.',1)[0]
                 
                 # construct new filename
-                outfile = os.path.join(out_dir, filename + series_suffix.format(idf) + '.tif')
+                if path.endswith('tiff'):
+                    outfile = os.path.join(out_dir, filename + series_suffix.format(idf) + '.tiff')
+                else:
+                    outfile = os.path.join(out_dir, filename + series_suffix.format(idf) + '.tif')
                                 
                 # save as ImageJ-compatible tiff stack
                 imsave(outfile, res, imagej=True)
