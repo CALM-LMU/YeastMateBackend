@@ -1,1 +1,0 @@
-reference_pixel_size = 110
