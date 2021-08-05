@@ -142,8 +142,8 @@ def crop_img(img, box, out_dir, filename, tag, index, cls_indices, meta, box_exp
         new_mask = np.zeros_like(new_im)
 
         for idx, cls_idx in cls_indices.items():
-            new_mask[new_im == int(idx)] = cls_idx
+            new_mask[new_im == int(idx)] = int(idx)
         
-        new_im = new_mask.astype(np.uint8)
+        new_im = new_mask.astype(np.uint16)
 
     tifimsave(os.path.join(out_dir, name_ + suffix), new_im, imagej=negate_boolean(mask))
