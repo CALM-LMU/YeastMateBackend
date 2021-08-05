@@ -86,6 +86,12 @@ def get_detection_frame(image, zstack, zslice, multichannel, graychannel, video,
 
     return frame, framedict
 
+def unscale_results(detections, mask, pixel_size, ref_pixel_size):
+    detections = unscale_things(detections, pixel_size, ref_pixel_size)
+    mask = unscale_mask(mask, pixel_size, ref_pixel_size=ref_pixel_size)
+
+    return detections, mask
+
 def detect_one_image(image, score_thresholds, ip):    
     image = image.astype(np.float32)
     image = Image.fromarray(image, mode='F')
@@ -107,8 +113,5 @@ def detect_one_image(image, score_thresholds, ip):
     mask_data = base64.b64decode(result['mask'])
     mask = Image.open(BytesIO(mask_data))
     mask = np.asarray(mask)
-
-    things = unscale_things(things, pixel_size, ref_pixel_size)
-    mask = unscale_mask(mask, pixel_size, ref_pixel_size=ref_pixel_size)
 
     return detections, mask

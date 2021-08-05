@@ -54,7 +54,7 @@ def parse_export_classes(array):
         val_tag = cls['Tag']
 
         val_tag = val_tag.replace(" ", "_")
-        val_tag = lower(val_tag)
+        val_tag = val_tag.lower()
 
         tags[int(cls['Class ID'])] = val_tag
 
@@ -62,8 +62,8 @@ def parse_export_classes(array):
 
 def get_class_indices(key, dic):
     class_indices = {}
-    for n,link in enumerate(thing['links']):
-        obj = dic['detections'][link]
+    for n,link in enumerate(dic[key]['links']):
+        obj = dic[link]
 
         for m, uplink in enumerate(obj['links']):
             if uplink == key:
@@ -141,9 +141,9 @@ def crop_img(img, box, out_dir, filename, tag, index, cls_indices, meta, box_exp
     if mask:
         new_mask = np.zeros_like(new_im)
 
-        for idx, cls_idx in cls_indices:
+        for idx, cls_idx in cls_indices.items():
             new_mask[new_im == int(idx)] = cls_idx
         
-        new_im = new_im.astype(np.uint8)
+        new_im = new_mask.astype(np.uint8)
 
     tifimsave(os.path.join(out_dir, name_ + suffix), new_im, imagej=negate_boolean(mask))
