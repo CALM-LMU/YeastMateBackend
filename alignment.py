@@ -93,7 +93,7 @@ def transform_planewise(img, model, axes):
     return img_t
 
 
-def process_single_file(path, out_dir, alignment, video_split, file_format='.nd2', tif_channels=None, remove_channels=None, series_suffix='_series{}',
+def process_single_file(path, out_dir, alignment, video_split, remove_channels=None, series_suffix='_series{}',
                         channels_cam1=(0,2), channels_cam2=(1,3),
                         alignment_channel_cam1=0,           
                         alignment_channel_cam2=1):
@@ -102,95 +102,100 @@ def process_single_file(path, out_dir, alignment, video_split, file_format='.nd2
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     
-    if file_format == '.nd2':
-        reader = pims.open(path)
+    try:
+        reader = pims.ND2_Reader(path)
+    except:
+        reader = pims.Bioformats(path)
 
-        iterax = ''
-        if 'm' in reader.sizes.keys():
-            iterax += 'm'
-            m = reader.sizes['m']
-        else:
-            m = 1
+    iterax = ''
+    if 'm' in reader.sizes.keys():
+        iterax += 'm'
+        m = reader.sizes['m']
+    else:
+        m = 1
 
-        if 't' in reader.sizes.keys():
-            iterax += 't'
-            t = reader.sizes['t']
-        else:
-            t = 1
+    if 't' in reader.sizes.keys():
+        iterax += 't'
+        t = reader.sizes['t']
+    else:
+        t = 1
 
-        bundleax = 'c'
-        if 'z' in reader.sizes.keys():
-            bundleax += 'z'
-            z = reader.sizes['z']
-        else:
-            z = 1
+    bundleax = 'c'
+    if 'z' in reader.sizes.keys():
+        bundleax += 'z'
+        z = reader.sizes['z']
+    else:
+        z = 1
 
-        bundleax += 'yx'
+    bundleax += 'yx'
 
-        c = reader.sizes['c'] - len(remove_channels)
+    c = reader.sizes['c'] - len(remove_channels)
 
-        reader.bundle_axes = bundleax
-        reader.iter_axes = iterax
-        
-        # go through single images
-        h,ta = os.path.split(path)
-        filename = ta.rsplit('.',1)[0]
+    reader.bundle_axes = bundleax
+    reader.iter_axes = iterax
+    
+    # go through single images
+    h,ta = os.path.split(path)
+    filename = ta.rsplit('.',1)[0]
+
+    if not video_split:
         imagestack = memmap(os.path.join(out_dir, filename + series_suffix.format(1) + '.tif'), shape=(t, z, c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
-        for idx, img in enumerate(reader):
-            if alignment:
-                # get channels for alignment
-                img0 = img[alignment_channel_cam1]
-                img1 = img[alignment_channel_cam2]
+    for idx, img in enumerate(reader):
+        if alignment:
+            # get channels for alignment
+            img0 = img[alignment_channel_cam1]
+            img1 = img[alignment_channel_cam2]
 
-                if 'z' in reader.bundle_axes:
-                    img0 = np.max(img0, axis=0)
-                    img1 = np.max(img1, axis=0)
-                
-                # align
-                model = align_orb_ransac_cv2(img0, img1)
-
-                if model is None:
-                    print('Not enough correspondences found, skipping image {}, series {}.'.format(path, idx), flush=True)
-                    continue
-            
-            # collect all channels
-            res = []
-            for ch, chimg in enumerate(img):  
-                img_ = chimg 
-                # transform if channel belongs to camera 2
-                if alignment and ch in channels_cam2 and ch != alignment_channel_cam2:
-                    img_ = transform_planewise(img_, model, reader.bundle_axes)
-
-                if ch not in remove_channels:        
-                    	res.append(img_)
-                
-            # stack along axis 1 for ImageJ-compatible ZCYX output
             if 'z' in reader.bundle_axes:
-                res = np.stack(res, axis=1)
-            else:
-                res = np.stack(res, axis=0)
-                res = np.expand_dims(res, axis=1)
+                img0 = np.max(img0, axis=0)
+                img1 = np.max(img1, axis=0)
             
-            folderidx = idx // t + 1
-            fileidx = (idx - (folderidx-1) * t) + 1
-            if video_split:
-                # get filename before suffix
-                h,ta = os.path.split(path)
-                filename = ta.rsplit('.',1)[0]
+            # align
+            model = align_orb_ransac_cv2(img0, img1)
 
-                if not os.path.exists(os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames')):
-                    os.makedirs(os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames'))
-                
-                # construct new filename
-                outfile = os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames', filename + series_suffix.format(folderidx) + '_slice{}'.format(fileidx) + '.tif')
-                            
-                # save as ImageJ-compatible tiff stack
-                imsave(outfile, res, imagej=True)
+            if model is None:
+                print('Not enough correspondences found, skipping image {}, series {}.'.format(path, idx), flush=True)
+                continue
+        
+        # collect all channels
+        res = []
+        for ch, chimg in enumerate(img):  
+            img_ = chimg 
+            # transform if channel belongs to camera 2
+            if alignment and ch in channels_cam2 and ch != alignment_channel_cam2:
+                img_ = transform_planewise(img_, model, reader.bundle_axes)
 
+            if ch not in remove_channels:        
+                    res.append(img_)
+            
+        # stack along axis 1 for ImageJ-compatible ZCYX output
+        if 'z' in reader.bundle_axes:
+            res = np.stack(res, axis=1)
+        else:
+            res = np.stack(res, axis=0)
+            res = np.expand_dims(res, axis=1)
+        
+        folderidx = idx // t + 1
+        fileidx = (idx - (folderidx-1) * t) + 1
+        if video_split:
+            # get filename before suffix
+            h,ta = os.path.split(path)
+            filename = ta.rsplit('.',1)[0]
+
+            if not os.path.exists(os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames')):
+                os.makedirs(os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames'))
+            
+            # construct new filename
+            outfile = os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames', filename + series_suffix.format(folderidx) + '_slice{}'.format(fileidx) + '.tif')
+                        
+            # save as ImageJ-compatible tiff stack
+            imsave(outfile, res, imagej=True)
+
+        else:
             imagestack[idx - t * idx//t] = res
             imagestack.flush()
-      
+        
             if (idx+1) % t == 0:
                 # Generate new tiff file
             
@@ -205,110 +210,4 @@ def process_single_file(path, out_dir, alignment, video_split, file_format='.nd2
 
                 imagestack = memmap(outfile, shape=(t, z, c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
-    else:
-        if alignment:          
-            image = imread(path)
 
-            correct_order = {'f': 0, 't': 1, 'c': 2, 'z':3, 'h':4, 'w':5}
-
-            try:
-                if tif_channels['f'] is None:
-                    tif_channels['f'] = len(correct_order.values()) + 1
-                    image = np.expand_dims(image, axis=-1)
-
-                if tif_channels['t'] is None:
-                    tif_channels['t'] = len(correct_order.values()) + 1
-                    image = np.expand_dims(image, axis=-1)
-                
-                if tif_channels['z'] is None:
-                    z_stack = False
-
-                    tif_channels['f'] = len(correct_order.values()) + 1
-                    image = np.expand_dims(image, axis=-1)
-                else:
-                    z_stack = True
-
-                new_order = []
-                for k in correct_order.keys():
-                    new_order.append(tif_channels[k])
-
-                image = np.transpose(image, new_order)
-
-            except:
-                print('Order of tif_channels was invalid! Can not perform alignment!', flush=True)
-
-            for idf, fov in enumerate(image):
-                timestack = []
-                for idt,tp in enumerate(fov):
-                    img0 = tp[alignment_channel_cam1]
-                    img1 = tp[alignment_channel_cam2]
-
-                    if z_stack:
-                        img0 = np.max(img0, axis=0)
-                        img1 = np.max(img1, axis=0)
-                    else:
-                        img0 = img0[0]
-                        img1 = img1[0]
-
-                    # align
-                    model = align_orb_ransac_cv2(img0, img1)
-
-                    if model is None:
-                        print('Not enough correspondences found, skipping image {}, series {}.'.format(path, idf*idt), flush=True)
-                        # TODO Add logfile here for skipped files!
-                        continue
-
-                    # collect all channels
-                    imgs = []
-                    for ch in range(tp.shape[0]):   
-                        img_ = tp[ch]
-
-                        # transform if channel belongs to camera 2
-                        if ch in channels_cam2:
-                            img_ = transform_planewise(img_, model)
-                    
-                        imgs.append(img_)
-                        
-                    # stack along axis 1 for ImageJ-compatible ZCXY output
-                    res = np.asarray(imgs)
-                    res = np.swapaxes(res, 0, 1)
-
-                    # remove no longer necessary channels
-                    if remove_channels is not None:
-                        res = np.delete(res, remove_channels, axis=1)
-
-                    if video_split:
-                        # get filename before suffix
-                        h,ta = os.path.split(path)
-                        filename = ta.rsplit('.',1)[0]
-
-                        if not os.path.exists(os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames')):
-                            os.makedirs(os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames'))
-                        
-                        # construct new filename
-                        if path.endswith('tiff'):
-                            outfile = os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames', filename + series_suffix.format(idf) + '_slice{}'.format(idt) + '.tiff')
-                        else:
-                            outfile = os.path.join(out_dir, filename + '_series' + str(idf) + '_single_frames', filename + series_suffix.format(idf) + '_slice{}'.format(idt) + '.tif')           
-                        
-                        # save as ImageJ-compatible tiff stack
-                        imsave(outfile, res, imagej=True)
-
-                    timestack.append(res)
-
-                res = np.asarray(timestack)
-            
-                # get filename before suffix
-                h,ta = os.path.split(path)
-                filename = ta.rsplit('.',1)[0]
-                
-                # construct new filename
-                if path.endswith('tiff'):
-                    outfile = os.path.join(out_dir, filename + series_suffix.format(idf) + '.tiff')
-                else:
-                    outfile = os.path.join(out_dir, filename + series_suffix.format(idf) + '.tif')
-                                
-                # save as ImageJ-compatible tiff stack
-                imsave(outfile, res, imagej=True)
-
-            print('Image is already a tif file! Skipping process.', flush=True)

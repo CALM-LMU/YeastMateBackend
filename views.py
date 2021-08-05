@@ -58,11 +58,9 @@ def queue_job():
     if 'preprocessing' in request.json.keys():
         alignment = request.json['preprocessing']['alignment']
         channels = request.json['preprocessing']['channels'] 
-        file_format = request.json['preprocessing']['inputFileFormat'] 
-        dimensions = request.json['preprocessing']['dimensions']
         video_split = request.json['preprocessing']['videoSplit']
 
-        pipeline = pipeline.then(preprocessing_task, path, alignment, channels, file_format, dimensions, video_split)
+        pipeline = pipeline.then(preprocessing_task, path, alignment, channels, video_split)
 
     if 'detection' in request.json.keys():      
         include_tag = request.json['includeTag']
@@ -71,6 +69,7 @@ def queue_job():
         zstack = request.json['detection']['zstack']
         zslice = int(request.json['detection']['zSlice']) / 100
         video = request.json['detection']['video']
+        multichannel = request.json['detection']['channelSwitch']
         graychannel = int(request.json['detection']['graychannel'])
         pixel_size = float(request.json['detection']['pixelSize'])
         lower_quantile = int(request.json['detection']['lowerQuantile'])
@@ -84,7 +83,7 @@ def queue_job():
 
         score_thresholds = {0:single_threshold, 1:mating_threshold, 2:budding_threshold}
 
-        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, zslice, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size)
+        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size)
 
     if 'export' in request.json.keys():
         crop = request.json['export']['crop']

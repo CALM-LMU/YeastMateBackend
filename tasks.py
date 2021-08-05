@@ -14,7 +14,7 @@ from app import huey
 
 from alignment import process_single_file
 from utils import get_align_channel_vars, get_align_dimension_vars, crop_img, parse_export_classes, get_class_indices
-from detection import detect_one_image
+from detection import detect_one_image, preprocess_image, get_detection_frame
            
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -26,9 +26,8 @@ def start_pipeline():
 
 
 @huey.task()
-def preprocessing_task(path, alignment, channels, file_format, dimensions, video_split, series_suffix='_series{}'):
+def preprocessing_task(path, alignment, channels, video_split, series_suffix='_series{}'):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
-    tif_channels = get_align_dimension_vars(dimensions)
 
     in_dir = path
     out_dir = os.path.join(in_dir, 'aligned')
@@ -42,17 +41,18 @@ def preprocessing_task(path, alignment, channels, file_format, dimensions, video
     # align and re-save all files
     for i, path in enumerate(files_to_process):
         process_single_file(path, out_dir,
-                alignment=alignment, video_split=video_split,
-                file_format=file_format,
-                tif_channels=tif_channels, remove_channels=remove_channels, 
+                alignment=alignment, 
+                video_split=video_split,
+                remove_channels=remove_channels, 
                 series_suffix=series_suffix,
                 channels_cam1=channels_cam1, channels_cam2=channels_cam2,
                 alignment_channel_cam1=alignment_channel_cam1, 
-                alignment_channel_cam2=alignment_channel_cam2)   
+                alignment_channel_cam2=alignment_channel_cam2
+            )   
 
 
 @huey.task()
-def detect_task(path, include_tag, exclude_tag, zstack, zslice, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size):
+def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size):
     if os.path.isdir(os.path.join(path, 'aligned')):
         in_dir = os.path.join(path, 'aligned')
     else:
@@ -65,25 +65,19 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, graychannel, low
         files_to_process = [x for x in files_to_process if exclude_tag not in x]
 
     for i,path in enumerate(files_to_process):
-        ori_image = tifimread(path)
+        image = tifimread(path)
 
-        image = np.squeeze(ori_image)
+        image, framedict = get_detection_frame(image, zstack, zslice, multichannel, graychannel, video, frame_selection)
 
-        if video:
-            if frame_selection == 'last':
-                image = image[-1]
-            elif frame_selection == 'first':
-                image = image[0]
-        else:
-            frame_selection = 'null'
+        image = preprocess_image(image, lower_quantile, upper_quantile, pixel_size, ref_pixel_size=110)
+        
+        detections, mask = detect_one_image(img, score_thresholds, ip)
 
-        things, mask = detect_one_image(img, lower_quantile, upper_quantile, pixel_size, zstack, zslice, graychannel, score_thresholds, ip, ref_pixel_size=ref_pixel_size)
-
-        resdict = {'image': os.path.basename(path), 'metadata': {}, 'detections': things}
+        resdict = {'image': os.path.basename(path), 'metadata': {}, 'detections': detections}
                 
         resdict['metadata']['height'] = imagelist[0].shape[0]
         resdict['metadata']['width'] = imagelist[0].shape[1]
-        resdict['metadata']['detection_frame'] = frame_selection
+        resdict['metadata']['detection_frame'] = framedict
         resdict['metadata']['source'] = 'Detection'
         resdict['metadata']['bbox_format'] = 'x1y1x2y2'
 

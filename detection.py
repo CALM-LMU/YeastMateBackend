@@ -9,6 +9,7 @@ from skimage.io import imsave
 
 from skimage.transform import rescale
 from skimage.exposure import rescale_intensity
+from skimage.color import rgb2gray
 
 import logging
 
@@ -42,13 +43,7 @@ def unscale_things(things, pixel_size, ref_pixel_size=110):
 
     return things
 
-def preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, zslice, graychannel, ref_pixel_size=110):
-    if zstack:
-        image = image[int(image.shape[0]*zslice)]
-
-    if len(image.shape) > 2:    
-        image = image[graychannel,:,:]
-
+def preprocess_image(image, lower_quantile, upper_quantile, pixel_size, ref_pixel_size=110):
     image = image.astype(np.float32)
     lq, uq = np.percentile(image, [lower_quantile, upper_quantile])
     image = rescale_intensity(image, in_range=(lq,uq), out_range=(0,1))
@@ -57,9 +52,41 @@ def preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, 
 
     return image
 
-def detect_one_image(image, lower_quantile, upper_quantile, pixel_size, zstack, zslice, graychannel, score_thresholds, ip, ref_pixel_size=110):
-    image = preprocess_image(image, lower_quantile, upper_quantile, pixel_size, zstack, zslice, graychannel, ref_pixel_size=110)
-    
+def get_detection_frame(image, zstack, zslice, multichannel, graychannel, video, frame_selection):
+    framedict = {'t':"", "z":"", "c":""}
+
+    image = np.squeeze(image)
+
+    try:
+        if video:
+            if frame_selection == 'last':
+                framedict['t'] = str(image.shape[0])
+                image = image[-1]
+            elif frame_selection == 'first':
+                framedict['t'] = "0"
+                image = image[0]
+
+        if zstack:
+            framedict['z'] = int(image.shape[0]*zslice)
+            image = image[framedict['z']]
+
+        if multichannel: 
+            framedict['c'] = graychannel  
+            image = image[graychannel,:,:]
+        else:
+            if len(image.shape) == 3 and image.shape[-1] == 3:
+                image = rgb2gray(image)
+    except IndexError:
+        raise IndexError('Image dimensions too small for selected video, zstack and channel settings!')
+
+    if len(image.shape) > 2:
+        raise IndexError('Image dimensions too big for selected video, zstack and channel settings! Image musts consist only of time, z, channel and XY dimensions.')
+
+    frame = image.copy()
+
+    return frame, framedict
+
+def detect_one_image(image, score_thresholds, ip):    
     image = image.astype(np.float32)
     image = Image.fromarray(image, mode='F')
     
@@ -75,7 +102,7 @@ def detect_one_image(image, lower_quantile, upper_quantile, pixel_size, zstack, 
 
     result = requests.post("http://{}/predict".format(ip), files=filedict).json()
 
-    things = result['things']
+    detections = result['detections']
    
     mask_data = base64.b64decode(result['mask'])
     mask = Image.open(BytesIO(mask_data))
@@ -84,4 +111,4 @@ def detect_one_image(image, lower_quantile, upper_quantile, pixel_size, zstack, 
     things = unscale_things(things, pixel_size, ref_pixel_size)
     mask = unscale_mask(mask, pixel_size, ref_pixel_size=ref_pixel_size)
 
-    return things, mask
+    return detections, mask

@@ -120,7 +120,7 @@ def crop_img(img, box, out_dir, filename, tag, index, cls_indices, meta, box_exp
 
     if box_expansion:
         x1, y1, x2, y2 = enlarge_box(box, boxsize, meta['height'], meta['width'])
-    elif boxscale_switch
+    elif boxscale_switch:
         x1, y1, x2, y2 = scale_box(box, boxscale, meta['height'], meta['width'])
     else:
         x1, y1, x2, y2 = map(int, box)
