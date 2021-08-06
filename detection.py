@@ -38,8 +38,8 @@ def unscale_things(things, pixel_size, ref_pixel_size=110):
     scale_factor = 1/scale_factor
 
     if scale_factor != 1.0:
-        for n, thing in enumerate(things):
-           things[n]['box'] = [x*scale_factor for x in thing['box']]
+        for key, thing in things.items():
+           things[key]['box'] = [int(x*scale_factor) for x in thing['box']]
 
     return things
 

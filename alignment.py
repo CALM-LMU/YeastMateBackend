@@ -101,11 +101,17 @@ def process_single_file(path, out_dir, alignment, video_split, remove_channels=N
     # create output dir, if it does not exist yet
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
+
+    if not alignment:
+        remove_channels = []
     
     try:
         reader = pims.ND2_Reader(path)
     except:
         reader = pims.Bioformats(path)
+
+    reader.sizes['t'] = 10
+    del reader.sizes['m']
 
     iterax = ''
     if 'm' in reader.sizes.keys():
@@ -128,7 +134,7 @@ def process_single_file(path, out_dir, alignment, video_split, remove_channels=N
         z = 1
 
     bundleax += 'yx'
-
+    
     c = reader.sizes['c'] - len(remove_channels)
 
     reader.bundle_axes = bundleax
@@ -166,7 +172,7 @@ def process_single_file(path, out_dir, alignment, video_split, remove_channels=N
             if alignment and ch in channels_cam2 and ch != alignment_channel_cam2:
                 img_ = transform_planewise(img_, model, reader.bundle_axes)
 
-            if not alignment or ch not in remove_channels:        
+            if ch not in remove_channels:        
                 res.append(img_)
             
         # stack along axis 1 for ImageJ-compatible ZCYX output
@@ -196,7 +202,7 @@ def process_single_file(path, out_dir, alignment, video_split, remove_channels=N
             imagestack[idx - t * idx//t] = res
             imagestack.flush()
         
-            if (idx+1) % t == 0:
+            if (idx+1) % t == 0 and t != 1:
                 # Generate new tiff file
             
                 folderidx = (idx+1) // t + 1

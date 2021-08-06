@@ -30,13 +30,10 @@ def preprocessing_task(path, alignment, channels, video_split, series_suffix='_s
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
 
     in_dir = path
-    out_dir = os.path.join(in_dir, 'aligned')
+    out_dir = os.path.join(in_dir, 'yeastmate')
     
-    # get all input files
-    if file_format == '.nd2':
-        files_to_process = glob(os.path.join(in_dir, "*.nd2"))
-    else:
-        files_to_process = glob(os.path.join(in_dir, "*.tif")) + glob(os.path.join(in_dir, "*.tiff"))
+    files_to_process = glob(os.path.join(in_dir, "*"))
+    files_to_process = [path for path in files_to_process if os.path.isfile(path)]
 
     # align and re-save all files
     for i, path in enumerate(files_to_process):
@@ -53,8 +50,8 @@ def preprocessing_task(path, alignment, channels, video_split, series_suffix='_s
 
 @huey.task()
 def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size):
-    if os.path.isdir(os.path.join(path, 'aligned')):
-        in_dir = os.path.join(path, 'aligned')
+    if os.path.isdir(os.path.join(path, 'yeastmate')):
+        in_dir = os.path.join(path, 'yeastmate')
     else:
         in_dir = path
 
@@ -63,7 +60,6 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, gr
 
     if exclude_tag != '':
         files_to_process = [x for x in files_to_process if exclude_tag not in x]
-
 
     for i,path in enumerate(files_to_process):
         image = tifimread(path)
@@ -103,17 +99,15 @@ def export_task(path, crop, classes, box_expansion, boxsize, boxscale_switch, bo
     if len(crop_classes) == 0:
         return
 
-    if os.path.isdir(os.path.join(path, 'aligned')):
-        in_dir = os.path.join(path, 'aligned')
+    if os.path.isdir(os.path.join(path, 'yeastmate')):
+        in_dir = os.path.join(path, 'yeastmate')
     else:
         in_dir = path
 
     files_to_process = glob(os.path.join(in_dir, "*_mask.tif")) + glob(os.path.join(in_dir, "*_mask.tiff"))
 
-    out_dir = os.path.join(path, 'crops')
-    print(out_dir)
+    out_dir = os.path.join(in_dir, 'crops')
     if not os.path.exists(out_dir):
-        print('why not making')
         os.makedirs(out_dir)
 
     for filepath in files_to_process:

@@ -94,6 +94,9 @@ def scale_box(box, boxscale, height, width):
     boxsize_x *= boxscale
     boxsize_y *= boxscale
 
+    boxsize_x = int(boxsize_x)
+    boxsize_y = int(boxsize_y)
+
     centerx = (x1 + x2) // 2
     centery = (y1 + y2) // 2
 

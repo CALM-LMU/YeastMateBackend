@@ -66,8 +66,8 @@ def queue_job():
         include_tag = request.json['includeTag']
         exclude_tag = request.json['excludeTag']
         
-        advanced_settings = request.json['advancedSettings']
-        super_advanced_settings = request.json['superAdvancedSettings']
+        advanced_settings = request.json['detection']['advancedSettings']
+        super_advanced_settings = request.json['detection']['superAdvancedSettings']
         zstack = request.json['detection']['zstack']
         zslice = int(request.json['detection']['zSlice']) / 100
         video = request.json['detection']['video']
