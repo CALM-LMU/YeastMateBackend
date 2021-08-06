@@ -166,8 +166,8 @@ def process_single_file(path, out_dir, alignment, video_split, remove_channels=N
             if alignment and ch in channels_cam2 and ch != alignment_channel_cam2:
                 img_ = transform_planewise(img_, model, reader.bundle_axes)
 
-            if ch not in remove_channels:        
-                    res.append(img_)
+            if not alignment or ch not in remove_channels:        
+                res.append(img_)
             
         # stack along axis 1 for ImageJ-compatible ZCYX output
         if 'z' in reader.bundle_axes:

@@ -65,10 +65,13 @@ def queue_job():
     if 'detection' in request.json.keys():      
         include_tag = request.json['includeTag']
         exclude_tag = request.json['excludeTag']
-
+        
+        advanced_settings = request.json['advancedSettings']
+        super_advanced_settings = request.json['superAdvancedSettings']
         zstack = request.json['detection']['zstack']
         zslice = int(request.json['detection']['zSlice']) / 100
         video = request.json['detection']['video']
+        frame_selection = request.json['detection']['frameSelection']
         multichannel = request.json['detection']['channelSwitch']
         graychannel = int(request.json['detection']['graychannel'])
         pixel_size = float(request.json['detection']['pixelSize'])
@@ -77,11 +80,21 @@ def queue_job():
         single_threshold = int(request.json['detection']['singleThreshold']) / 100
         mating_threshold = int(request.json['detection']['matingThreshold']) / 100
         budding_threshold = int(request.json['detection']['buddingThreshold']) / 100
-        frame_selection = request.json['detection']['frameSelection']
         ip = request.json['detection']['ip']
         ref_pixel_size = int(request.json['detection']['referencePixelSize'])
 
-        score_thresholds = {0:single_threshold, 1:mating_threshold, 2:budding_threshold}
+        if not super_advanced_settings:
+            ref_pixel_size = 110
+
+        if not advanced_settings:
+            score_thresholds = {0:0.9, 1:0.75, 2:0.75}
+
+            lower_quantile = 2
+            upper_quantile = 98
+            pixel_size = 110
+
+        else:
+            score_thresholds = {0:single_threshold, 1:mating_threshold, 2:budding_threshold}
 
         pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size)
 
