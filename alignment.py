@@ -182,7 +182,11 @@ def process_single_file(path, out_dir, alignment,
     fileending = '_series{}_frame{}.tif'
 
     outfile = os.path.join(out_dir, filename + fileending.format(1, 1))
-    imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
+
+    if video_split:
+        imagestack = memmap(outfile, shape=(1, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
+    else:
+        imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
     for fov in range(m):
         for frame in range(t):
@@ -201,26 +205,41 @@ def process_single_file(path, out_dir, alignment,
                             zstack.append(reader.get_frame_2D(t=frame, c=channel, z=zslice))
 
                         zstack = transform_planewise(np.asarray(zstack), model)
-                        imagestack[frame,:,new_c,:,:] = img
+
+                        if video_split:
+                            imagestack[0,:,new_c,:,:] = img
+                        else:
+                            imagestack[frame,:,new_c,:,:] = img
 
                     else:
                         for zslice in range(z):
                             img = reader.get_frame_2D(t=frame, c=channel, z=zslice)
-                            imagestack[frame,zslice,new_c,:,:] = img
 
-            if video_split and fov+1 != m and frame+1 != t:
-                if frame+1 != t:
-                    outfile = os.path.join(out_dir, filename + fileending.format(fov+1, frame+2))
-                else:
-                    outfile = os.path.join(out_dir, filename + fileending.format(fov+2, 1))
+                            if video_split:
+                                imagestack[0,zslice,new_c,:,:] = img
+                            else:
+                                imagestack[frame,zslice,new_c,:,:] = img
 
+            if video_split:
+                imagestack.flush()
+
+                if fov+1 != m or frame+1 != t:
+                    if frame+1 != t:
+                        outfile = os.path.join(out_dir, filename + fileending.format(fov+1, frame+2))
+                    else:
+                        outfile = os.path.join(out_dir, filename + fileending.format(fov+2, 1))
+
+                    imagestack = memmap(outfile, shape=(1, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
+        
+        if not video_split:
+            imagestack.flush()
+
+            if fov+1 != m:
+                outfile = os.path.join(out_dir, filename + fileending.format(fov+2, 1))
                 imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
-
-        if not video_split and fov+1 != m:
-            outfile = os.path.join(out_dir, filename + fileending.format(fov+2, 1))
-            imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
         if bioformats:
             reader.series = fov+1
             reader._change_series()
- 
+    
+    del imagestack
