@@ -73,28 +73,58 @@ def align_orb_ransac_cv2(img1, img2, plot=False):
 
     return model
 
-
-def transform_planewise(img, model, axes):
+def transform_planewise(img, model):
     # transform every plane of the stack
-    if 'z' in axes:
-        img_t = np.zeros_like(img)
+    img_t = np.zeros_like(img)
 
-        def _plane_warp(i):
-            img_t[i] += warp(img[i], model, preserve_range=True).astype(img.dtype)
+    def _plane_warp(i):
+        img_t[i] += warp(img[i], model, preserve_range=True).astype(img.dtype)
 
-        # warp planes multithreaded
-        with ThreadPoolExecutor() as tpe:
-            futures = [tpe.submit(_plane_warp, i) for i in range(img.shape[0])]
-            [f.result() for f in futures]
+    # warp planes multithreaded
+    with ThreadPoolExecutor() as tpe:
+        futures = [tpe.submit(_plane_warp, i) for i in range(img.shape[0])]
+        [f.result() for f in futures]
 
-    else:
-        img_t = warp(img, model, preserve_range=True).astype(img.dtype)
-    
     return img_t
 
+def get_alignment_model(reader, z, fov, frame, alignment_channel_cam1, alignment_channel_cam2, bioformats):
+    channel_1 = []
+    for zslice in range(z):
+        if bioformats:
+            channel_1.append(reader.get_frame_2D(t=frame, c=alignment_channel_cam1, z=zslice))
+        else:
+            channel_1.append(reader.get_frame_2D(m=fov, t=frame, c=alignment_channel_cam1, z=zslice))
+    
+    channel_1 = np.max(np.asarray(channel_1), axis=0)
+    
+    channel_2 = []
+    for zslice in range(z):
+        if bioformats:
+            channel_2.append(reader.get_frame_2D(t=frame, c=alignment_channel_cam2, z=zslice))
+        else:
+            channel_2.append(reader.get_frame_2D(m=fov, t=frame, c=alignment_channel_cam2, z=zslice))
+    
+    channel_2 = np.max(np.asarray(channel_2), axis=0)
 
-def process_single_file(path, out_dir, alignment, video_split, remove_channels=None, series_suffix='_series{}',
-                        channels_cam1=(0,2), channels_cam2=(1,3),
+    model = align_orb_ransac_cv2(channel_1, channel_2)
+
+    return model
+
+def get_channel_offset(n_channels, remove_channels):
+    channel_offset = {}
+
+    offset = 0
+    for n in range(n_channels):
+        if n in remove_channels:
+            offset += 1
+            
+        channel_offset[n] = offset
+
+    return channel_offset
+
+def process_single_file(path, out_dir, alignment, 
+                        video_split, remove_channels=None,
+                        channels_cam2=(1,3),
                         alignment_channel_cam1=0,           
                         alignment_channel_cam2=1):
     
@@ -107,113 +137,90 @@ def process_single_file(path, out_dir, alignment, video_split, remove_channels=N
     
     try:
         reader = pims.ND2_Reader(path)
+        bioformats = False
     except:
         reader = pims.Bioformats(path)
+        bioformats = True
 
-    reader.sizes['t'] = 10
-    del reader.sizes['m']
-
-    iterax = ''
-    if 'm' in reader.sizes.keys():
-        iterax += 'm'
+    iterax = []
+    if not bioformats:
+        iterax = ['m']
+    
+    if not bioformats:
+        if not 'm' in reader.sizes.keys():
+            reader.sizes['m'] = 1
         m = reader.sizes['m']
     else:
-        m = 1
+        m = reader.size_series
 
-    if 't' in reader.sizes.keys():
-        iterax += 't'
-        t = reader.sizes['t']
-    else:
-        t = 1
+    if not 't' in reader.sizes.keys():
+        reader.sizes['t'] = 1
 
-    bundleax = 'c'
-    if 'z' in reader.sizes.keys():
-        bundleax += 'z'
-        z = reader.sizes['z']
-    else:
-        z = 1
+    if not 'z' in reader.sizes.keys():
+        reader.sizes['z'] = 1
 
-    bundleax += 'yx'
+    if not 'c' in reader.sizes.keys():
+         reader.sizes['c'] = 1
+
+    t = reader.sizes['t']
+    z = reader.sizes['z']
+    c = reader.sizes['c']
+
+    bundleax = ['t', 'z', 'c', 'y', 'x']
     
-    c = reader.sizes['c'] - len(remove_channels)
-
     reader.bundle_axes = bundleax
     reader.iter_axes = iterax
+
+    total_c = c - len(remove_channels)
+
+    if video_split and t == 1:
+        video_split = False
     
-    # go through single images
     h,ta = os.path.split(path)
     filename = ta.rsplit('.',1)[0]
 
-    if not video_split:
-        imagestack = memmap(os.path.join(out_dir, filename + series_suffix.format(1) + '.tif'), shape=(t, z, c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
+    fileending = '_series{}_frame{}.tif'
 
-    for idx, img in enumerate(reader):
-        if alignment:
-            # get channels for alignment
-            img0 = img[alignment_channel_cam1]
-            img1 = img[alignment_channel_cam2]
+    outfile = os.path.join(out_dir, filename + fileending.format(1, 1))
+    imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
-            if 'z' in reader.bundle_axes:
-                img0 = np.max(img0, axis=0)
-                img1 = np.max(img1, axis=0)
-            
-            # align
-            model = align_orb_ransac_cv2(img0, img1)
+    for fov in range(m):
+        for frame in range(t):
+            if alignment:
+                model = get_alignment_model(reader, z, fov, frame, alignment_channel_cam1, alignment_channel_cam2, bioformats)
 
-            if model is None:
-                print('Not enough correspondences found, skipping image {}, series {}.'.format(path, idx), flush=True)
-                continue
-        
-        # collect all channels
-        res = []
-        for ch, chimg in enumerate(img):  
-            img_ = chimg 
-            # transform if channel belongs to camera 2
-            if alignment and ch in channels_cam2 and ch != alignment_channel_cam2:
-                img_ = transform_planewise(img_, model, reader.bundle_axes)
+            channel_offset = get_channel_offset(c, remove_channels)
 
-            if ch not in remove_channels:        
-                res.append(img_)
-            
-        # stack along axis 1 for ImageJ-compatible ZCYX output
-        if 'z' in reader.bundle_axes:
-            res = np.stack(res, axis=1)
-        else:
-            res = np.stack(res, axis=0)
-            res = np.expand_dims(res, axis=1)
-        
-        folderidx = idx // t + 1
-        fileidx = (idx - (folderidx-1) * t) + 1
-        if video_split:
-            # get filename before suffix
-            h,ta = os.path.split(path)
-            filename = ta.rsplit('.',1)[0]
+            for channel in range(c):
+                if channel not in remove_channels:
+                    new_c = channel - channel_offset[channel]
 
-            if not os.path.exists(os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames')):
-                os.makedirs(os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames'))
-            
-            # construct new filename
-            outfile = os.path.join(out_dir, filename + '_series' + str(folderidx) + '_single_frames', filename + series_suffix.format(folderidx) + '_slice{}'.format(fileidx) + '.tif')
-                        
-            # save as ImageJ-compatible tiff stack
-            imsave(outfile, res, imagej=True)
+                    if alignment and channel in channels_cam2:
+                        zstack = []
+                        for zslice in range(z):
+                            zstack.append(reader.get_frame_2D(t=frame, c=channel, z=zslice))
 
-        else:
-            imagestack[idx - t * idx//t] = res
-            imagestack.flush()
-        
-            if (idx+1) % t == 0 and t != 1:
-                # Generate new tiff file
-            
-                folderidx = (idx+1) // t + 1
+                        zstack = transform_planewise(np.asarray(zstack), model)
+                        imagestack[frame,:,new_c,:,:] = img
 
-                # get filename before suffix
-                h,ta = os.path.split(path)
-                filename = ta.rsplit('.',1)[0]
-                
-                # construct new filename
-                outfile = os.path.join(out_dir, filename + series_suffix.format(folderidx) + '.tif')
+                    else:
+                        for zslice in range(z):
+                            img = reader.get_frame_2D(t=frame, c=channel, z=zslice)
+                            imagestack[frame,zslice,new_c,:,:] = img
 
-                imagestack = memmap(outfile, shape=(t, z, c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
+            if video_split and fov+1 != m and frame+1 != t:
+                if frame+1 != t:
+                    outfile = os.path.join(out_dir, filename + fileending.format(fov+1, frame+2))
+                else:
+                    outfile = os.path.join(out_dir, filename + fileending.format(fov+2, 1))
 
+                imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
+        if not video_split and fov+1 != m:
+            outfile = os.path.join(out_dir, filename + fileending.format(fov+2, 1))
+            imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
+
+        if bioformats:
+            reader.series = fov+1
+            reader._change_series()
+ 

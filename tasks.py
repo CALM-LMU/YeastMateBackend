@@ -26,7 +26,7 @@ def start_pipeline():
 
 
 @huey.task()
-def preprocessing_task(path, alignment, channels, video_split, series_suffix='_series{}'):
+def preprocessing_task(path, alignment, channels, video_split):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
 
     in_dir = path
@@ -41,8 +41,7 @@ def preprocessing_task(path, alignment, channels, video_split, series_suffix='_s
                 alignment=alignment, 
                 video_split=video_split,
                 remove_channels=remove_channels, 
-                series_suffix=series_suffix,
-                channels_cam1=channels_cam1, channels_cam2=channels_cam2,
+                channels_cam2=channels_cam2,
                 alignment_channel_cam1=alignment_channel_cam1, 
                 alignment_channel_cam2=alignment_channel_cam2
             )   
