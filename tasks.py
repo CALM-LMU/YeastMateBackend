@@ -69,7 +69,7 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, gr
         
         try:
             detections, mask = detect_one_image(image, score_thresholds, ip)
-        continue:
+        except:
             print('Image corrupted/unfit for detection, skipping image!')
             continue
 
