@@ -23,11 +23,11 @@ napari = Analysis(['annotation.py'],
              cipher=block_cipher,
              noarchive=False)
 
-io = Analysis(['main.py'],
+io = Analysis(['hueyserver.py'],
              pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
              binaries=[],
-             datas=[(get_package_paths('pims')[1],"pims"), (get_package_paths('pims_nd2')[1],"pims_nd2"), ('./tasks.py', '.'), ('./alignment.py', '.'), ('./detection.py', '.'), ('./utils.py', '.'), ('./views.py', '.'), ('./app.py', '.')],
-             hiddenimports=[ 'tasks', 'pims', 'pims_nd2'],
+             datas=[(get_package_paths('jpype')[1],"jpype"),(get_package_paths('pims')[1],"pims"), ('./tasks.py', '.'), ('./alignment.py', '.'), ('./detection.py', '.'), ('./utils.py', '.'), ('./views.py', '.'), ('./app.py', '.')],
+             hiddenimports=[ 'tasks', 'pims', 'jpype'],
              hookspath=['.'],
              runtime_hooks=[],
              excludes=[],
@@ -36,7 +36,20 @@ io = Analysis(['main.py'],
              cipher=block_cipher,
              noarchive=False)
 
-MERGE( (napari, 'napari', 'napari'), (io, 'main', 'backend') )
+bento = Analysis(['bentoserver.py'],
+             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
+             binaries=[],
+             datas=[("./yeastmate","."),(get_package_paths('dask')[1],"dask"),(get_package_paths('fvcore')[1],"fvcore"),(get_package_paths('detectron2')[1],"detectron2"),(get_package_paths('shapely')[1],"shapely"),(get_package_paths('tifffile')[1],"tifffile")],
+             hiddenimports=['detectron2', 'scipy.special.cython_special', 'opencv-python', 'scikit-image', 'pcolor', 'imgaug', 'shapely', 'tifffile', "fvcore"],
+             hookspath=[],
+             runtime_hooks=[],
+             excludes=[],
+             win_no_prefer_redirects=False,
+             win_private_assemblies=False,
+             cipher=block_cipher,
+             noarchive=False)
+
+MERGE( (napari, 'napari', 'napari'), (io, 'hueyserver', 'hueyserver'), (bento, 'bentoserver', 'bentoserver') )
 
 napari_pyz = PYZ(napari.pure, napari.zipped_data,
              cipher=block_cipher)
@@ -70,11 +83,8 @@ io_pyz = PYZ(io.pure, io.zipped_data,
 MISSING_DYLIBS = [
     Path(find_library("libiomp5md")),
     Path(find_library("vcruntime140")),
-    Path(find_library("msvcp140")),
-    Path('C:\\Users\\david\\miniconda3\\Lib\\site-packages\\pims_nd2\\ND2SDK\\win\\nd2ReadSDK.h')
-]
-
-nd2lib = glob('C:\\Users\\david\\miniconda3\\Lib\\site-packages\\pims_nd2\\ND2SDK\\win\\x64\\*')
+    Path(find_library("msvcp140"))
+    ]
 
 for lib in nd2lib:
     print(lib)
@@ -94,6 +104,7 @@ io_exe = EXE(io_pyz,
           strip=False,
           upx=True,
           console=True )
+
 io_coll = COLLECT(io_exe,
                io.binaries,
                io.zipfiles,
@@ -102,3 +113,41 @@ io_coll = COLLECT(io_exe,
                upx=True,
                upx_exclude=[],
                name='YeastMateIO')
+
+MISSING_DYLIBS = []
+
+dll = glob('C:\\Users\\david\\miniconda3\\envs\\fullpackage\\Library\bin\\*.dll')
+
+for lib in dll:
+    MISSING_DYLIBS.append(Path(lib))
+
+bento.binaries += TOC([
+    (lib.name, str(lib.resolve()), 'BINARY') for lib in MISSING_DYLIBS
+])
+
+bento_pyz = PYZ(bento.pure, bento.zipped_data,
+             cipher=block_cipher)
+
+bento_exe = EXE(bento_pyz,
+          bento.scripts,
+          bento.binaries,
+          bento.zipfiles,
+          bento.datas,
+          [],
+          name='YeastMateDetector',
+          debug=False,
+          bootloader_ignore_signals=False,
+          strip=False,
+          upx=True,
+          upx_exclude=[],
+          runtime_tmpdir=None,
+          console=True )
+
+bento_coll = COLLECT(bento_exe,
+               bento.binaries,
+               bento.zipfiles,
+               bento.datas,
+               strip=False,
+               upx=True,
+               upx_exclude=[],
+               name='YeastMateDetector')
