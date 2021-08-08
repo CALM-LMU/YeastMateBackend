@@ -87,22 +87,16 @@ def transform_planewise(img, model):
 
     return img_t
 
-def get_alignment_model(reader, z, fov, frame, alignment_channel_cam1, alignment_channel_cam2, bioformats):
+def get_alignment_model(reader, z, fov, frame, alignment_channel_cam1, alignment_channel_cam2):
     channel_1 = []
     for zslice in range(z):
-        if bioformats:
-            channel_1.append(reader.get_frame_2D(t=frame, c=alignment_channel_cam1, z=zslice))
-        else:
-            channel_1.append(reader.get_frame_2D(m=fov, t=frame, c=alignment_channel_cam1, z=zslice))
+        channel_1.append(reader.get_frame_2D(t=frame, c=alignment_channel_cam1, z=zslice))
     
     channel_1 = np.max(np.asarray(channel_1), axis=0)
     
     channel_2 = []
     for zslice in range(z):
-        if bioformats:
-            channel_2.append(reader.get_frame_2D(t=frame, c=alignment_channel_cam2, z=zslice))
-        else:
-            channel_2.append(reader.get_frame_2D(m=fov, t=frame, c=alignment_channel_cam2, z=zslice))
+        channel_2.append(reader.get_frame_2D(t=frame, c=alignment_channel_cam2, z=zslice))
     
     channel_2 = np.max(np.asarray(channel_2), axis=0)
 
@@ -135,23 +129,11 @@ def process_single_file(path, out_dir, alignment,
     if not alignment:
         remove_channels = []
     
-    try:
-        reader = pims.ND2_Reader(path)
-        bioformats = False
-    except:
-        reader = pims.Bioformats(path)
-        bioformats = True
+    reader = pims.Bioformats(path)
 
     iterax = []
-    if not bioformats:
-        iterax = ['m']
-    
-    if not bioformats:
-        if not 'm' in reader.sizes.keys():
-            reader.sizes['m'] = 1
-        m = reader.sizes['m']
-    else:
-        m = reader.size_series
+
+    m = reader.size_series
 
     if not 't' in reader.sizes.keys():
         reader.sizes['t'] = 1
@@ -191,7 +173,7 @@ def process_single_file(path, out_dir, alignment,
     for fov in range(m):
         for frame in range(t):
             if alignment:
-                model = get_alignment_model(reader, z, fov, frame, alignment_channel_cam1, alignment_channel_cam2, bioformats)
+                model = get_alignment_model(reader, z, fov, frame, alignment_channel_cam1, alignment_channel_cam2)
 
             channel_offset = get_channel_offset(c, remove_channels)
 
@@ -238,8 +220,7 @@ def process_single_file(path, out_dir, alignment,
                 outfile = os.path.join(out_dir, filename + fileending.format(fov+2, 1))
                 imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
-        if bioformats:
-            reader.series = fov+1
-            reader._change_series()
+        reader.series = fov+1
+        reader._change_series()
     
     del imagestack
