@@ -7,6 +7,7 @@ dependencies:
   - ca-certificates=2021.7.5=haa95532_1
   - certifi=2021.5.30=py37haa95532_0
   - cudatoolkit=10.1.243=h74a9793_0
+  - cython==0.29.24
   - freetype=2.10.4=hd328e21_0
   - intel-openmp=2021.3.0=haa95532_3372
   - jpeg=9b=hb83a4c4_2
@@ -65,7 +66,6 @@ dependencies:
     - configparser==5.0.2
     - contextlib2==21.6.0
     - cycler==0.10.0
-    - cython==0.29.24
     - dash==1.21.0
     - dash-core-components==1.17.1
     - dash-html-components==1.1.4
@@ -75,7 +75,7 @@ dependencies:
     - debugpy==1.4.1
     - decorator==5.0.9
     - deepmerge==0.3.0
-    - git+https://https://github.com/DGMaxime/detectron2-windows.git
+    - git+https://github.com/DGMaxime/detectron2-windows.git
     - docker==5.0.0
     - docstring-parser==0.10
     - docutils==0.17.1
@@ -143,7 +143,7 @@ dependencies:
     - psutil==5.8.0
     - pyasn1==0.4.8
     - pyasn1-modules==0.2.8
-    - pycocotools==2.0
+    - git+https://github.com/philferriere/cocoapi.git#subdirectory=PythonAPI
     - pydantic==1.8.2
     - pydot==1.4.2
     - pygments==2.9.0
