@@ -53,7 +53,7 @@ bento = Analysis(['bentoserver.py'],
                 (get_package_paths('tifffile')[1],"tifffile")
                 ],            
              hiddenimports=[
-                 'biodetectron', 
+                 'yeastmatedetector', 
                  'torch',
                  'torchvision',
                  'detectron2', 
