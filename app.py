@@ -29,7 +29,5 @@ CORS(app)
 tmpdir = tempfile.gettempdir()
 hueypath = os.path.join(tmpdir, 'huey.db')
 
-print(hueypath)
-
 huey =  SqliteHuey(filename=hueypath)
 huey.storage.put_data('tasks', json.dumps({}).encode('utf-8'))
