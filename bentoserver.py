@@ -27,7 +27,6 @@ if __name__ == '__main__':
         module = 'yeastmate_cpu'
     elif args.device == 'gpu' and torch.cuda.is_available() == True:
         module = 'yeastmate_gpu'
-        print('true')
     else:
         module = 'yeastmate_cpu'
 
