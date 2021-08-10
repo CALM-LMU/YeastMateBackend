@@ -1,5 +1,6 @@
 import sys
 import logging
+import argparse
 
 from huey.consumer import Consumer
 from huey.consumer_options import ConsumerConfig
