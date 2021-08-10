@@ -180,7 +180,8 @@ def get_imported_layers(dic, mask, score_thresholds):
         if class_idx == 0: continue
 
         # Skip objects with score < threshold.
-        if thing['score'][0] < score_thresholds[str(class_idx)]: continue
+        if score_thresholds is not None:
+            if thing['score'][0] < score_thresholds[str(class_idx)]: continue
         
         # Add class layers
         class_counter = class_idx
@@ -313,7 +314,7 @@ if __name__ == '__main__':
     # Parse arguments from Electron frontend.
     parser = argparse.ArgumentParser()
     parser.add_argument('path', type=str, help='The path to the images you want to label.')
-    parser.add_argument('score_thresholds', default="", type=str, help='Score thresholds for the different classes.')
+    parser.add_argument('score_thresholds', nargs='?', default="", type=str, help='Score thresholds for the different classes.')
     args = parser.parse_args()
 
     path = args.path
@@ -323,14 +324,16 @@ if __name__ == '__main__':
     namelist = ['mating', 'budding']
 
     # Convert score thresholds from string to dictionary of floats.
-    score_thresholds = {}
+    if score_thresholds_string:
+        score_thresholds = {}
+        score_classes = score_thresholds_string.split('C')
 
-    score_classes = score_thresholds_string.split('C')
+        for class_threshold in score_classes:
+            key, value = class_threshold.split('S')
 
-    for class_threshold in score_classes:
-        key, value = class_threshold.split('S')
-
-        score_thresholds[key] = float(value)
+            score_thresholds[key] = float(value)
+    else:
+        score_thresholds = None
 
     # Get all tif files in folder.
     imglist = get_imglist(path)
