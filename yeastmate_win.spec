@@ -11,7 +11,12 @@ block_cipher = None
 napari = Analysis(['annotation.py'],
              pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
              binaries=[],
-             datas=[(get_package_paths('dask')[1],"dask"), (get_package_paths('skimage')[1],"skimage"), (get_package_paths('vispy')[1],"vispy"),(get_package_paths('napari')[1],"napari")],
+             datas=[
+                 (get_package_paths('dask')[1],"dask"), 
+                 (get_package_paths('skimage')[1],"skimage"), 
+                 (get_package_paths('vispy')[1],"vispy"),
+                 (get_package_paths('napari')[1],"napari")
+                 ],
              hiddenimports=['scipy.special.cython_special', 'skimage', "vispy.ext._bundled.siz", "vispy.app.backends._pyqt5", "napari", "PyQt5"],
              hookspath=[],
              hooksconfig={},
@@ -25,7 +30,13 @@ napari = Analysis(['annotation.py'],
 io = Analysis(['hueyserver.py'],
              pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
              binaries=[],
-             datas=[(get_package_paths('jpype')[1],"jpype"),(get_package_paths('pims')[1],"pims"), ('./tasks.py', '.'), ('./alignment.py', '.'), ('./detection.py', '.'), ('./utils.py', '.'), ('./views.py', '.'), ('./app.py', '.')],
+             datas=[
+                 (get_package_paths('jpype')[1],"jpype"),
+                 (get_package_paths('pims')[1],"pims"), 
+                 ('./tasks.py', '.'), ('./alignment.py', '.'), 
+                 ('./detection.py', '.'), ('./utils.py', '.'), 
+                 ('./views.py', '.'), ('./app.py', '.')
+                 ],
              hiddenimports=[ 'tasks', 'pims', 'jpype'],
              hookspath=['.'],
              runtime_hooks=[],
@@ -49,7 +60,7 @@ bento = Analysis(['bentoserver.py'],
                 (get_package_paths('pythonjsonlogger')[1],"pythonjsonlogger"),
                 (get_package_paths('bentoml')[1],"bentoml"),
                 (get_package_paths('fvcore')[1],"fvcore"),
-                (get_package_paths('biodetectron')[1],"biodetectron"),
+                (get_package_paths('yeastmatedetector')[1],"yeastmatedetector"),
                 (get_package_paths('tifffile')[1],"tifffile")
                 ],            
              hiddenimports=[
