@@ -8,7 +8,6 @@ from PyInstaller.utils.hooks import get_package_paths
 
 block_cipher = None
 
-
 napari = Analysis(['annotation.py'],
              pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
              binaries=[],
@@ -23,11 +22,11 @@ napari = Analysis(['annotation.py'],
              cipher=block_cipher,
              noarchive=False)
 
-io = Analysis(['main.py'],
+io = Analysis(['hueyserver.py'],
              pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
              binaries=[],
-             datas=[(get_package_paths('pims')[1],"pims"), (get_package_paths('pims_nd2')[1],"pims_nd2"), ('./tasks.py', '.'), ('./alignment.py', '.'), ('./detection.py', '.'), ('./utils.py', '.'), ('./views.py', '.'), ('./app.py', '.')],
-             hiddenimports=[ 'tasks', 'pims', 'pims_nd2'],
+             datas=[(get_package_paths('jpype')[1],"jpype"),(get_package_paths('pims')[1],"pims"), ('./tasks.py', '.'), ('./alignment.py', '.'), ('./detection.py', '.'), ('./utils.py', '.'), ('./views.py', '.'), ('./app.py', '.')],
+             hiddenimports=[ 'tasks', 'pims', 'jpype'],
              hookspath=['.'],
              runtime_hooks=[],
              excludes=[],
@@ -36,7 +35,7 @@ io = Analysis(['main.py'],
              cipher=block_cipher,
              noarchive=False)
 
-MERGE( (napari, 'napari', 'napari'), (io, 'main', 'backend') )
+MERGE( (napari, 'napari', 'napari'), (io, 'hueyserver', 'hueyserver') )
 
 napari_pyz = PYZ(napari.pure, napari.zipped_data,
              cipher=block_cipher)
@@ -70,15 +69,8 @@ io_pyz = PYZ(io.pure, io.zipped_data,
 MISSING_DYLIBS = [
     Path(find_library("libiomp5md")),
     Path(find_library("vcruntime140")),
-    Path(find_library("msvcp140")),
-    Path('C:\\Users\\david\\miniconda3\\Lib\\site-packages\\pims_nd2\\ND2SDK\\win\\nd2ReadSDK.h')
-]
-
-nd2lib = glob('C:\\Users\\david\\miniconda3\\Lib\\site-packages\\pims_nd2\\ND2SDK\\win\\x64\\*')
-
-for lib in nd2lib:
-    print(lib)
-    MISSING_DYLIBS.append(Path(lib))
+    Path(find_library("msvcp140"))
+    ]
 
 io.binaries += TOC([
     (lib.name, str(lib.resolve()), 'BINARY') for lib in MISSING_DYLIBS
@@ -94,6 +86,7 @@ io_exe = EXE(io_pyz,
           strip=False,
           upx=True,
           console=True )
+
 io_coll = COLLECT(io_exe,
                io.binaries,
                io.zipfiles,

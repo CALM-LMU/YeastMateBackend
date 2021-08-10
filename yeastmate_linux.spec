@@ -23,11 +23,13 @@ napari = Analysis(['annotation.py'],
                 (get_package_paths('scipy')[1],"scipy"), \
                 (get_package_paths('napari')[1],"napari"), \
 		(get_package_paths('PySide2')[1],"PySide2"), \
+                (get_package_paths('PyQt5')[1],"PyQt5"), \
                 (dynload_path, "lib-dynload") 
                 ],
              hiddenimports=['skimage', \
                 "vispy.ext._bundled.siz", \
-                "napari", "binascii"
+                "napari", "binascii",
+                "PySide2.QtWidgets", "PySide2.QtGui", "PySide2.QtCore", "PySide2.QtOpenGL","PyQt5.QtOpenGL"
                 ],
              hookspath=[],
              hooksconfig={},

@@ -67,7 +67,12 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, gr
 
         image = preprocess_image(image, lower_quantile, upper_quantile, pixel_size, ref_pixel_size)
         
-        detections, mask = detect_one_image(image, score_thresholds, ip)
+        try:
+            detections, mask = detect_one_image(image, score_thresholds, ip)
+        except:
+            print('Image corrupted/unfit for detection, skipping image!')
+            continue
+
         detections, mask = unscale_results(detections, mask, pixel_size, ref_pixel_size)
 
         resdict = {'image': os.path.basename(path), 'metadata': {}, 'detections': detections}

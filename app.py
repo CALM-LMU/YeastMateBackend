@@ -1,6 +1,7 @@
 import os
 import json
 import threading
+import tempfile
 
 from flask import Flask
 from flask_cors import CORS
@@ -25,5 +26,8 @@ app.config.from_object(__name__)
 
 CORS(app)
 
-huey =  SqliteHuey()
+tmpdir = tempfile.gettempdir()
+hueypath = os.path.join(tmpdir, 'huey.db')
+
+huey =  SqliteHuey(filename=hueypath)
 huey.storage.put_data('tasks', json.dumps({}).encode('utf-8'))

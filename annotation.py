@@ -325,10 +325,10 @@ if __name__ == '__main__':
     # Convert score thresholds from string to dictionary of floats.
     score_thresholds = {}
 
-    score_classes = score_thresholds_string.split(';')
+    score_classes = score_thresholds_string.split('C')
 
     for class_threshold in score_classes:
-        key, value = class_threshold.split('=')
+        key, value = class_threshold.split('S')
 
         score_thresholds[key] = float(value)
 
