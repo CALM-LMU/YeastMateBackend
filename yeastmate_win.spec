@@ -9,7 +9,7 @@ from PyInstaller.utils.hooks import get_package_paths
 block_cipher = None
 
 napari = Analysis(['annotation.py'],
-             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
+             pathex=[],
              binaries=[],
              datas=[
                  (get_package_paths('dask')[1],"dask"), 
@@ -28,7 +28,7 @@ napari = Analysis(['annotation.py'],
              noarchive=False)
 
 io = Analysis(['hueyserver.py'],
-             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
+             pathex=[],
              binaries=[],
              datas=[
                  (get_package_paths('jpype')[1],"jpype"),
@@ -47,7 +47,7 @@ io = Analysis(['hueyserver.py'],
              noarchive=False)
 
 bento = Analysis(['bentoserver.py'],
-             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
+             pathex=[],
              binaries=[],
              datas=[
                 ('./yeastmate_gpu', 'yeastmate_gpu'),
@@ -133,7 +133,7 @@ io_exe = EXE(io_pyz,
           io.scripts,
           [],
           exclude_binaries=True,
-          name='YeastMateIO',
+          name='YeastMateBackend',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
@@ -147,7 +147,7 @@ io_coll = COLLECT(io_exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='YeastMateIO')
+               name='YeastMateBackend')
 
 MISSING_DYLIBS = []
 
@@ -167,7 +167,7 @@ bento_exe = EXE(bento_pyz,
           bento.scripts,
           [],
           exclude_binaries=True,
-          name='YeastMateDetector',
+          name='YeastMateDetectionServer',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
@@ -181,4 +181,4 @@ bento_coll = COLLECT(bento_exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='YeastMateDetector')
+               name='YeastMateDetectionServer')
