@@ -45,11 +45,11 @@ io = Analysis(['main.py'],
                 ('./tasks.py', '.'), ('./alignment.py', '.'), \
                 ('./detection.py', '.'), ('./utils.py', '.'), \
                 ('./views.py', '.'), ('./app.py', '.'), \
-                ('./_sysconfigdata_i686_conda_cos6_linux_gnu.py', '.'), \
-                ('./_sysconfigdata_m_darwin_darwin.py', '.'), \
-                ('./_sysconfigdata_powerpc64le_conda_cos7_linux_gnu.py', '.'), \
-                ('./_sysconfigdata_x86_64_apple_darwin13_4_0.py', '.'), \
-                ('./_sysconfigdata_x86_64_conda_cos6_linux_gnu.py', '.') \
+                ('./osx_libs/_sysconfigdata_i686_conda_cos6_linux_gnu.py', '.'), \
+                ('./osx_libs/_sysconfigdata_m_darwin_darwin.py', '.'), \
+                ('./osx_libs/_sysconfigdata_powerpc64le_conda_cos7_linux_gnu.py', '.'), \
+                ('./osx_libs/_sysconfigdata_x86_64_apple_darwin13_4_0.py', '.'), \
+                ('./osx_libs/_sysconfigdata_x86_64_conda_cos6_linux_gnu.py', '.') \
                 ],
              hiddenimports=[ 'tasks', 'pims', 'pims_nd2'],
              hookspath=['.'],
