@@ -23,16 +23,13 @@ def consumer_main():
     consumer = huey.create_consumer(workers=1, periodic=False, backoff=1)
     consumer.run()
 
-def start_server(port=11001):
-    try:
-        app.run(host='0.0.0.0', port=port)
-    except:
-        start_server(port=port+1)
-
-
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('port', type=int, help='Port of bentoml server.')
+    args = parser.parse_args()
+
     freeze_support()
     proc = Process(target=consumer_main)
     proc.start()
 
-    start_server(port=11001)
+    app.run(host='0.0.0.0', port=args.port)
