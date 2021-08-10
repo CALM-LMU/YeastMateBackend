@@ -46,7 +46,7 @@ dependencies:
     - attrs==21.2.0
     - babel==2.9.1
     - backcall==0.2.0
-    - bentoml==0.13.1
+    - git+https://github.com/davidbunk/BentoML.git
     - git+https://github.com/CALM-LMU/YeastMateDetector.git
     - boto3==1.18.16
     - botocore==1.21.16
