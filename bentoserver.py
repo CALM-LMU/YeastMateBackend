@@ -16,12 +16,12 @@ from multiprocessing import freeze_support
 path = os.getcwd()
 
 if __name__ == '__main__':
+    freeze_support()
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('port', type=int, help='Port of bentoml server.')
     parser.add_argument('device', type=str, help='Set device to cpu or gpu.')
     args = parser.parse_args()
-
-    freeze_support()
 
     if args.device == 'cpu':
         module = 'yeastmate_cpu'

@@ -25,11 +25,12 @@ def consumer_main():
     consumer.run()
 
 if __name__ == '__main__':
+    freeze_support()
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('port', type=int, help='Port of bentoml server.')
     args = parser.parse_args()
 
-    freeze_support()
     proc = Process(target=consumer_main)
     proc.start()
 
