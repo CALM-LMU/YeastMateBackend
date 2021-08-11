@@ -9,23 +9,29 @@ from PyInstaller.utils.hooks import get_package_paths
 
 block_cipher = None
 
+# Try and set lib-dynload and lib folder within conda environment automatically
+# In case this fails and produces an error or non-functional builds, set these paths manually
+
 package_path = get_package_paths('skimage')[1].split('/')
+
 dynload_path = os.path.join(*package_path[:-2])
 dynload_path = os.path.join(dynload_path, 'lib-dynload')
 dynload_path = '/' + dynload_path
 
+libpath = os.path.join(*package_path[:-2])
+
 napari = Analysis(['annotation.py'],
-             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
+             pathex=[],
              binaries=[],
-             datas=[(get_package_paths('dask')[1],"dask"), \
-                (get_package_paths('skimage')[1],"skimage"), \
-                (get_package_paths('vispy')[1],"vispy"),\
-                (get_package_paths('scipy')[1],"scipy"), \
-                (get_package_paths('napari')[1],"napari"), \
+             datas=[(get_package_paths('dask')[1],"dask"), 
+                (get_package_paths('skimage')[1],"skimage"), 
+                (get_package_paths('vispy')[1],"vispy"),
+                (get_package_paths('scipy')[1],"scipy"), 
+                (get_package_paths('napari')[1],"napari"), 
                 (dynload_path, "lib-dynload") 
                 ],
-             hiddenimports=['skimage', \
-                "vispy.ext._bundled.siz", "vispy.app.backends._pyqt5", \
+             hiddenimports=['skimage', 
+                "vispy.ext._bundled.siz", "vispy.app.backends._pyqt5", 
                 "napari", "PyQt5", "binascii"
                 ],
              hookspath=[],
@@ -37,21 +43,22 @@ napari = Analysis(['annotation.py'],
              cipher=block_cipher,
              noarchive=False)
 
-io = Analysis(['main.py'],
-             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
+io = Analysis(['hueyserver.py'],
+             pathex=[],
              binaries=[],
-             datas=[(get_package_paths('pims')[1],"pims"), \
-                (get_package_paths('pims_nd2')[1],"pims_nd2"), \
-                ('./tasks.py', '.'), ('./alignment.py', '.'), \
-                ('./detection.py', '.'), ('./utils.py', '.'), \
+             datas=[
+                (get_package_paths('jpype')[1],"jpype"),
+                (get_package_paths('pims')[1],"pims"), 
+                ('./tasks.py', '.'), ('./alignment.py', '.'), 
+                ('./detection.py', '.'), ('./utils.py', '.'), 
                 ('./views.py', '.'), ('./app.py', '.'), \
-                ('./osx_libs/_sysconfigdata_i686_conda_cos6_linux_gnu.py', '.'), \
-                ('./osx_libs/_sysconfigdata_m_darwin_darwin.py', '.'), \
-                ('./osx_libs/_sysconfigdata_powerpc64le_conda_cos7_linux_gnu.py', '.'), \
-                ('./osx_libs/_sysconfigdata_x86_64_apple_darwin13_4_0.py', '.'), \
-                ('./osx_libs/_sysconfigdata_x86_64_conda_cos6_linux_gnu.py', '.') \
+                ('./osx_libs/_sysconfigdata_i686_conda_cos6_linux_gnu.py', '.'), 
+                ('./osx_libs/_sysconfigdata_m_darwin_darwin.py', '.'), 
+                ('./osx_libs/_sysconfigdata_powerpc64le_conda_cos7_linux_gnu.py', '.'), 
+                ('./osx_libs/_sysconfigdata_x86_64_apple_darwin13_4_0.py', '.'), 
+                ('./osx_libs/_sysconfigdata_x86_64_conda_cos6_linux_gnu.py', '.') 
                 ],
-             hiddenimports=[ 'tasks', 'pims', 'pims_nd2'],
+             hiddenimports=[ 'tasks', 'pims', 'jpype'],
              hookspath=['.'],
              runtime_hooks=[],
              excludes=[],
@@ -61,7 +68,7 @@ io = Analysis(['main.py'],
              noarchive=False)
 
 bento = Analysis(['bentoserver.py'],
-             pathex=['C:\\Users\\david\\Projects\\MitoScannerBackend'],
+             pathex=[],
              binaries=[],
              datas=[
                 ('./yeastmate_cpu', 'yeastmate_cpu'),
@@ -73,15 +80,14 @@ bento = Analysis(['bentoserver.py'],
                 (get_package_paths('pythonjsonlogger')[1],"pythonjsonlogger"),
                 (get_package_paths('bentoml')[1],"bentoml"),
                 (get_package_paths('fvcore')[1],"fvcore"),
-                (get_package_paths('biodetectron')[1],"biodetectron"),
+                (get_package_paths('yeastmatedetector')[1],"yeastmatedetector"),
                 (get_package_paths('tifffile')[1],"tifffile")
                 ],            
              hiddenimports=[
-                 'biodetectron', 
+                 'yeastmatedetector', 
                  'torch',
                  'torchvision',
                  'detectron2', 
-                 'pythonjsonlogger', 
                  'yacs', 
                  'portalocker', 
                  'scipy.special.cython_special', 
@@ -136,12 +142,13 @@ io_exe = EXE(io_pyz,
           io.scripts,
           [],
           exclude_binaries=True,
-          name='YeastMateIO',
+          name='YeastMateBackend',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
           console=True )
+
 io_coll = COLLECT(io_exe,
                io.binaries,
                io.zipfiles,
@@ -149,11 +156,11 @@ io_coll = COLLECT(io_exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='YeastMateIO')
+               name='YeastMateBackend')
 
 MISSING_DYLIBS = []
 
-dll = glob('C:\\Users\\david\\miniconda3\\envs\\fullpackage\\Library\\bin\\*.dll')
+dll = glob(os.path.join(libpath, '*.dylib'))
 
 for lib in dll:
     MISSING_DYLIBS.append(Path(lib))
@@ -169,7 +176,7 @@ bento_exe = EXE(bento_pyz,
           bento.scripts,
           [],
           exclude_binaries=True,
-          name='YeastMateDetector',
+          name='YeastMateDetectionServer',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
@@ -183,5 +190,5 @@ bento_coll = COLLECT(bento_exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='YeastMateDetector')
+               name='YeastMateDetectionServer')
 

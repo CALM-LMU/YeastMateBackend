@@ -46,7 +46,7 @@ dependencies:
     - attrs==21.2.0
     - babel==2.9.1
     - backcall==0.2.0
-    - bentoml==0.13.1
+    - git+https://github.com/davidbunk/BentoML.git
     - git+https://github.com/CALM-LMU/YeastMateDetector.git
     - boto3==1.18.16
     - botocore==1.21.16
@@ -172,7 +172,7 @@ dependencies:
     - scikit-image==0.18.2
     - scipy==1.7.1
     - shiboken2==5.15.2
-    - simple-di==0.1.1
+    - simple-di==0.1.0
     - slicerator==1.0.0
     - snowballstemmer==2.1.0
     - sphinx==4.1.2
