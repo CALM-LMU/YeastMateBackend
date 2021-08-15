@@ -189,9 +189,9 @@ def process_single_file(path, out_dir, alignment,
                         zstack = transform_planewise(np.asarray(zstack), model)
 
                         if video_split:
-                            imagestack[0,:,new_c,:,:] = img
+                            imagestack[0,:,new_c,:,:] = zstack
                         else:
-                            imagestack[frame,:,new_c,:,:] = img
+                            imagestack[frame,:,new_c,:,:] = zstack
 
                     else:
                         for zslice in range(z):
