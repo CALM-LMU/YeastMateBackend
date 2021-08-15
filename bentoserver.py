@@ -19,8 +19,9 @@ if __name__ == '__main__':
     freeze_support()
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('port', type=int, help='Port of bentoml server.')
-    parser.add_argument('device', type=str, help='Set device to cpu or gpu.')
+    parser.add_argument('port', nargs='?', default=11005, type=int, help='Port of bentoml server.') # add portsearch
+    parser.add_argument('device', nargs='?', default='gpu', type=str, help='Set device to cpu or gpu.') # add gpu default
+    parser.add_argument('--path', type=str, help='Set path to bentoml package if executing Python script directly.')
     args = parser.parse_args()
 
     if args.device == 'cpu':
@@ -30,4 +31,9 @@ if __name__ == '__main__':
     else:
         module = 'yeastmate_cpu'
 
-    start_dev_server(os.path.join(path, module), args.port, False, False)
+    if args.path:
+        path = args.path
+    else:
+        path = os.path.join(path, module)
+
+    start_dev_server(path, args.port, False, False)
