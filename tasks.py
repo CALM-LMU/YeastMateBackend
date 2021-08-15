@@ -36,15 +36,19 @@ def preprocessing_task(path, alignment, channels, video_split):
     files_to_process = [path for path in files_to_process if os.path.isfile(path)]
 
     # align and re-save all files
-    for i, path in enumerate(files_to_process):
-        process_single_file(path, out_dir,
-                alignment=alignment, 
-                video_split=video_split,
-                remove_channels=remove_channels, 
-                channels_cam2=channels_cam2,
-                alignment_channel_cam1=alignment_channel_cam1, 
-                alignment_channel_cam2=alignment_channel_cam2
-            )   
+    for path in files_to_process:
+        try:
+            process_single_file(path, out_dir,
+                    alignment=alignment, 
+                    video_split=video_split,
+                    remove_channels=remove_channels, 
+                    channels_cam2=channels_cam2,
+                    alignment_channel_cam1=alignment_channel_cam1, 
+                    alignment_channel_cam2=alignment_channel_cam2
+                )   
+        except Exception as e:
+            print(e)
+            continue
 
 
 @huey.task()
