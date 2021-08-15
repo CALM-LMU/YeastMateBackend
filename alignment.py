@@ -220,7 +220,8 @@ def process_single_file(path, out_dir, alignment,
                 outfile = os.path.join(out_dir, filename + fileending.format(fov+2, 1))
                 imagestack = memmap(outfile, shape=(t, z, total_c, reader.sizes['y'], reader.sizes['x']), dtype=reader.pixel_type, imagej=True)
 
-        reader.series = fov+1
-        reader._change_series()
+        if fov + 1 != m:
+            reader.series = fov+1
+            reader._change_series()
     
     del imagestack
