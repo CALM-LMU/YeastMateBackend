@@ -14,6 +14,7 @@ from app import app
 from app import huey
 from tasks import *  # Import tasks so they are registered with Huey instance.
 from views import *  # Import views so they are registered with Flask app.
+from waitress import serve
 
 def consumer_main():
     # Set up logging for the "huey" namespace.
@@ -28,10 +29,16 @@ if __name__ == '__main__':
     freeze_support()
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('port', type=int, help='Port of bentoml server.')
+    parser.add_argument('--port', type=int, help='Port of IO server.', default=11002)
     args = parser.parse_args()
 
     proc = Process(target=consumer_main)
     proc.start()
 
-    app.run(host='0.0.0.0', port=args.port)
+    # app.run(host='0.0.0.0', port=args.port)
+
+    print(f'Running YeastMate IO backend server on port {args.port}. Press Ctrl-C to quit.')
+
+    serve(app, host='0.0.0.0', port=args.port)
+
+    print('Shutting down...')
