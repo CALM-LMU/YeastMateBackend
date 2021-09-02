@@ -6,9 +6,11 @@ block_cipher = None
 
 a = Analysis(['yeastmate_server.py'],
              pathex=[],
-             binaries=[(find_library('uv'), '.')],
+             binaries=[(find_library('uv'), '.')] if find_library('uv') is not None else [],
              datas=[
                  ('./yeastmate-artifacts', 'yeastmate-artifacts'),
+                 # TODO: do this more cleanly via hook?
+                 (get_package_paths('torchvision')[1],"torchvision"),
              ],
              hiddenimports=[],
              hookspath=['hooks'],
@@ -19,6 +21,13 @@ a = Analysis(['yeastmate_server.py'],
              win_private_assemblies=False,
              cipher=block_cipher,
              noarchive=False)
+
+# NB: we exclude libtorch_cpu.dylib here, as another copy will be put in the torch folder
+# otherwise, the detection server fails to start with some C++ error
+# https://stackoverflow.com/a/56853037
+excluded_binaries = ['libtorch_cpu.dylib']
+a.binaries = TOC([x for x in a.binaries if x[0] not in excluded_binaries])
+
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 
