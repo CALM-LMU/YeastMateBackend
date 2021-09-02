@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import get_package_paths
+from PyInstaller.utils.hooks import collect_dynamic_libs
+from pathlib import Path
 from ctypes.util import find_library
 
 block_cipher = None
@@ -22,10 +24,11 @@ a = Analysis(['yeastmate_server.py'],
              cipher=block_cipher,
              noarchive=False)
 
-# NB: we exclude libtorch_cpu.dylib here, as another copy will be put in the torch folder
+# NB: we exclude torch dynamic libraries, as another copy will be put in the torch folder
 # otherwise, the detection server fails to start with some C++ error
 # https://stackoverflow.com/a/56853037
-excluded_binaries = ['libtorch_cpu.dylib']
+# excluded_binaries = ['libtorch_cpu.dylib']
+excluded_binaries = [Path(lib[0]).name for lib in collect_dynamic_libs('torch')]
 a.binaries = TOC([x for x in a.binaries if x[0] not in excluded_binaries])
 
 pyz = PYZ(a.pure, a.zipped_data,

@@ -11,6 +11,8 @@ dependencies:
   - torchvision
   # - pywin32
   - pip:
+    # NB: conda numpy gave MKL-related errors after packaging, override with pip numpy
+    - numpy
     - flask
     - scikit-image
     - imgaug
