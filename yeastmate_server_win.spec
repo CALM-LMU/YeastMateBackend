@@ -6,7 +6,7 @@ block_cipher = None
 
 a = Analysis(['yeastmate_server.py'],
              pathex=[],
-             binaries=[(find_library('uv'), '.')],
+             binaries=[(find_library('uv'), '.')] if find_library('uv') is not None else [],
              datas=[
                  ('./yeastmate-artifacts', 'yeastmate-artifacts'),
              ],
