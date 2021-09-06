@@ -69,19 +69,19 @@ def queue_job():
         advanced_settings = request.json['detection']['advancedSettings']
         super_advanced_settings = request.json['detection']['superAdvancedSettings']
         zstack = request.json['detection']['zstack']
-        zslice = int(request.json['detection']['zSlice']) / 100
+        zslice = float(request.json['detection']['zSlice']) / 100
         video = request.json['detection']['video']
         frame_selection = request.json['detection']['frameSelection']
         multichannel = request.json['detection']['channelSwitch']
         graychannel = int(request.json['detection']['graychannel'])
         pixel_size = float(request.json['detection']['pixelSize'])
-        lower_quantile = int(request.json['detection']['lowerQuantile'])
-        upper_quantile = int(request.json['detection']['upperQuantile'])
-        single_threshold = int(request.json['detection']['singleThreshold']) / 100
-        mating_threshold = int(request.json['detection']['matingThreshold']) / 100
-        budding_threshold = int(request.json['detection']['buddingThreshold']) / 100
+        lower_quantile = float(request.json['detection']['lowerQuantile'])
+        upper_quantile = float(request.json['detection']['upperQuantile'])
+        single_threshold = float(request.json['detection']['singleThreshold']) / 100
+        mating_threshold = float(request.json['detection']['matingThreshold']) / 100
+        budding_threshold = float(request.json['detection']['buddingThreshold']) / 100
         ip = request.json['detection']['ip']
-        ref_pixel_size = int(request.json['detection']['referencePixelSize'])
+        ref_pixel_size = float(request.json['detection']['referencePixelSize'])
 
         if not super_advanced_settings:
             ref_pixel_size = 110
