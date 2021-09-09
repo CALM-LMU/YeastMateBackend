@@ -25,7 +25,7 @@ class YeastMateAnnotator:
         self.changed = False
 
         self.viewer = napari.Viewer()
-
+        
         self.set_hotkeys()
         self.next_image(0)
 
@@ -54,7 +54,7 @@ class YeastMateAnnotator:
         def forward(viewer):
             self.next_image(1)
 
-        @Viewer.bind_key('Backspace', overwrite=True)
+        @Viewer.bind_key('Left', overwrite=True)
         def backward(viewer):
             self.next_image(-1)
 
@@ -84,12 +84,13 @@ class YeastMateAnnotator:
                     elif reply == 'yes':
                         self.save_labels()
 
-                self.counter += direction
+                self.counter = (self.counter + direction) % len(self.imglist)
             
             # Reset Napari view
-            self.viewer.layers.select_all()
-            self.viewer.layers.remove_selected()
-            self.viewer.reset_view()
+            # NB: we manually do that in label_image due to bug in napari 0.4.11
+            # self.viewer.layers.select_all()
+            # self.viewer.layers.remove_selected()
+            # self.viewer.reset_view()
 
         if self.counter < len(self.imglist):
             # Load next image
@@ -333,6 +334,10 @@ class YeastMateAnnotator:
 
         # Add Napari layers to viewer  
 
+        # NB: napari 0.4.11 seems to crash if we remove the label layer and then add a new one
+        # therefore, we add new layers first and then remove the old ones
+        old_layers = list(self.viewer.layers)
+
         self.viewer.add_image(image)    
         self.viewer.add_labels(mask[:,:], opacity=0.3, name='single cell', visible=True)
             
@@ -348,9 +353,18 @@ class YeastMateAnnotator:
                 name = 'Class {}'.format(n+1)
 
             self.viewer.add_shapes(things, shape_type='path', edge_width=5, opacity=0.5, edge_color=self.colorlist[n], face_color=self.colorlist[n], name=name, visible=True)
-                
+        
+        # remove old layers
+        for layer in old_layers:
+            self.viewer.layers.remove(layer)
+        
+        # new layers will have received a "name [1]" label because old ones with the same name were still there
+        # remove that
+        for layer in self.viewer.layers:
+            layer.name = layer.name.replace(' [1]', '')
+
         self.viewer.layers.selection.active = self.viewer.layers[-1]
-    
+
 
 if __name__ == '__main__':
     # Parse arguments from Electron frontend.
