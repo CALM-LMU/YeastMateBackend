@@ -67,7 +67,6 @@ def queue_job():
         exclude_tag = request.json['excludeTag']
         
         advanced_settings = request.json['detection']['advancedSettings']
-        super_advanced_settings = request.json['detection']['superAdvancedSettings']
         zstack = request.json['detection']['zstack']
         zslice = int(request.json['detection']['zSlice']) / 100
         video = request.json['detection']['video']
@@ -75,16 +74,13 @@ def queue_job():
         multichannel = request.json['detection']['channelSwitch']
         graychannel = int(request.json['detection']['graychannel'])
         pixel_size = float(request.json['detection']['pixelSize'])
-        lower_quantile = int(request.json['detection']['lowerQuantile'])
-        upper_quantile = int(request.json['detection']['upperQuantile'])
-        single_threshold = int(request.json['detection']['singleThreshold']) / 100
-        mating_threshold = int(request.json['detection']['matingThreshold']) / 100
-        budding_threshold = int(request.json['detection']['buddingThreshold']) / 100
+        lower_quantile = float(request.json['detection']['lowerQuantile'])
+        upper_quantile = float(request.json['detection']['upperQuantile'])
+        single_threshold = float(request.json['detection']['singleThreshold']) / 100
+        mating_threshold = float(request.json['detection']['matingThreshold']) / 100
+        budding_threshold = float(request.json['detection']['buddingThreshold']) / 100
         ip = request.json['detection']['ip']
-        ref_pixel_size = int(request.json['detection']['referencePixelSize'])
-
-        if not super_advanced_settings:
-            ref_pixel_size = 110
+        ref_pixel_size = float(request.json['detection']['referencePixelSize'])
 
         if not advanced_settings:
             score_thresholds = {0:0.9, 1:0.75, 2:0.75}
@@ -99,14 +95,13 @@ def queue_job():
         pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size)
 
     if 'export' in request.json.keys():
-        crop = request.json['export']['crop']
         classes = request.json['export']['classes']
         boxsize = int(request.json['export']['boxSize'])
         box_expansion = request.json['export']['boxExpansion']
         boxscale = float(request.json['export']['boxScale'])
         boxscale_switch = request.json['export']['boxScaleSwitch']
 
-        pipeline = pipeline.then(export_task, path, crop, classes, box_expansion, boxsize, boxscale_switch, boxscale)
+        pipeline = pipeline.then(export_task, path, classes, box_expansion, boxsize, boxscale_switch, boxscale)
 
     huey.enqueue(pipeline)
 
