@@ -25,8 +25,7 @@ def rescale_image(image, pixel_size, ref_pixel_size=110):
     return image
 
 def unscale_mask(mask, original_shape):
-    if mask.shape != original_shape:
-        mask = resize(mask, original_shape, preserve_range=True, anti_aliasing=False, order=0)
+    mask = resize(mask, original_shape, preserve_range=True, anti_aliasing=False, order=0)
 
     return mask
 

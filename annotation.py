@@ -151,7 +151,7 @@ def save_labels():
         with open(imglist[counter].replace('.tif', '_detections.json'), 'w') as file:
             json.dump(res, file, indent=1)   
 
-def get_imported_layers(dic, mask, score_thresholds):
+def get_imported_layers(dic, mask):
 
     # Initialize dictionaries
     layers = {}
@@ -178,10 +178,6 @@ def get_imported_layers(dic, mask, score_thresholds):
 
         # No extra annotation layer for single cell (besides mask).
         if class_idx == 0: continue
-
-        # Skip objects with score < threshold.
-        if score_thresholds is not None:
-            if thing['score'][0] < score_thresholds[str(class_idx)]: continue
         
         # Add class layers
         class_counter = class_idx
@@ -243,7 +239,7 @@ def label_image():
     global counter
     global imglist
     global namelist
-    global score_thresholds
+    global colorlist
 
     # Load image and if existing, mask and detections.json
     image = imread(imglist[counter])
@@ -280,7 +276,7 @@ def label_image():
                 dic = json.load(file)
 
             # Convert objects in detections.json to Napari layers
-            layers = get_imported_layers(dic, mask, score_thresholds)  
+            layers = get_imported_layers(dic, mask)  
         except:
             # Convert settings from GUI to Napari layers
             layers = get_new_layers()
@@ -305,7 +301,7 @@ def label_image():
         except IndexError:
             name = 'Class {}'.format(n+1)
 
-        viewer.add_shapes(things, shape_type='path', edge_width=5, opacity=0.5, edge_color='red', face_color='red', name=name, visible=True)
+        viewer.add_shapes(things, shape_type='path', edge_width=5, opacity=0.5, edge_color=colorlist[n], face_color=colorlist[n], name=name, visible=True)
             
     viewer.layers.selection.active = viewer.layers[-1]
     
@@ -314,26 +310,13 @@ if __name__ == '__main__':
     # Parse arguments from Electron frontend.
     parser = argparse.ArgumentParser()
     parser.add_argument('path', type=str, help='The path to the images you want to label.')
-    parser.add_argument('score_thresholds', nargs='?', default="", type=str, help='Score thresholds for the different classes.')
     args = parser.parse_args()
 
     path = args.path
-    score_thresholds_string = args.score_thresholds
 
     # Set default classes.
     namelist = ['mating', 'budding']
-
-    # Convert score thresholds from string to dictionary of floats.
-    if score_thresholds_string:
-        score_thresholds = {}
-        score_classes = score_thresholds_string.split('C')
-
-        for class_threshold in score_classes:
-            key, value = class_threshold.split('S')
-
-            score_thresholds[key] = float(value)
-    else:
-        score_thresholds = None
+    colorlist = ['magenta', 'yellow']
 
     # Get all tif files in folder.
     imglist = get_imglist(path)

@@ -68,6 +68,7 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, gr
         image = tifimread(path)
 
         image, framedict = get_detection_frame(image, zstack, zslice, multichannel, graychannel, video, frame_selection)
+        original_shape = image.shape
 
         image = preprocess_image(image, lower_quantile, upper_quantile, pixel_size, ref_pixel_size)
         
@@ -77,7 +78,7 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, gr
             print('Image corrupted/unfit for detection, skipping image!')
             continue
 
-        detections, mask = unscale_results(detections, mask, pixel_size, ref_pixel_size)
+        detections, mask = unscale_results(detections, mask, original_shape, pixel_size, ref_pixel_size)
 
         resdict = {'image': os.path.basename(path), 'metadata': {}, 'detections': detections}
                 
@@ -98,10 +99,8 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, gr
                 
 
 @huey.task()
-def export_task(path, crop, classes, box_expansion, boxsize, boxscale_switch, boxscale):
-    if not crop:
-        return
-
+def export_task(path, classes, box_expansion, boxsize, boxscale_switch, boxscale):
+    
     crop_classes, tags = parse_export_classes(classes)
 
     if len(crop_classes) == 0:
