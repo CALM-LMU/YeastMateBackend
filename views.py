@@ -2,13 +2,15 @@ import os
 import copy
 import json
 
+from http import HTTPStatus
+
 from flask import render_template
 from flask import request, jsonify
 
-from app import app
-from tasks import start_pipeline, preprocessing_task, detect_task, export_task
+from yeastmatedetector import __version__ as yeastmate_version
 
-from app import huey
+from app import app, huey
+from tasks import start_pipeline, preprocessing_task, detect_task, export_task
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -47,7 +49,7 @@ def remove_execute_task(task, task_value, exc):
 
         huey.storage.put_data('tasks', json.dumps(tasks).encode('utf-8'))
 
-@app.route('/', methods=['POST'])
+@app.route('/submit', methods=['POST'])
 def queue_job():
 
     path = os.path.join(request.json['path'])
@@ -72,13 +74,15 @@ def queue_job():
         multichannel = request.json['detection']['channelSwitch']
         graychannel = int(request.json['detection']['graychannel'])
         pixel_size = float(request.json['detection']['pixelSize'])
+        ref_pixel_size = float(request.json['detection']['referencePixelSize'])
         lower_quantile = float(request.json['detection']['lowerQuantile'])
         upper_quantile = float(request.json['detection']['upperQuantile'])
         single_threshold = float(request.json['detection']['singleThreshold']) / 100
         mating_threshold = float(request.json['detection']['matingThreshold']) / 100
         budding_threshold = float(request.json['detection']['buddingThreshold']) / 100
-        ip = request.json['detection']['ip']
-        ref_pixel_size = float(request.json['detection']['referencePixelSize'])
+
+        ip = request.json['backend']['detectionIP']
+        port = request.json['backend']['detectionPort']
 
         if not advanced_settings:
             score_thresholds = {0:0.9, 1:0.75, 2:0.75}
@@ -104,7 +108,14 @@ def queue_job():
 
     return 'Queued, success'
 
-@app.route('/', methods=['GET'])
+@app.route('/status', methods=['GET'])
+def get_status():
+    return {
+            'name': 'YeastMate',
+            'version': yeastmate_version
+        }, HTTPStatus.OK
+
+@app.route('/tasks', methods=['GET'])
 def get_tasklist():
     tasklist = list(json.loads(huey.storage.peek_data('tasks')).values())
 
