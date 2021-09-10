@@ -124,7 +124,7 @@ huey_coll = COLLECT(huey_exe,
 # https://stackoverflow.com/a/56853037
 # excluded_binaries = ['libtorch_cpu.dylib']
 excluded_binaries = [Path(lib[0]).name for lib in collect_dynamic_libs('torch')]
-server.binaries = TOC([x for x in a.binaries if x[0] not in excluded_binaries])
+server.binaries = TOC([x for x in server.binaries if x[0] not in excluded_binaries])
 
 server_pyz = PYZ(server.pure, server.zipped_data,
              cipher=block_cipher)
