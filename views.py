@@ -15,8 +15,6 @@ logging.basicConfig(level=logging.DEBUG)
 
 @huey.pre_execute()
 def add_execute_task(task):
-    global executing_tasks
-
     tasks = json.loads(huey.storage.peek_data('tasks'))
 
     if task.name == 'preprocessing_task':
@@ -85,9 +83,8 @@ def queue_job():
         if not advanced_settings:
             score_thresholds = {0:0.9, 1:0.75, 2:0.75}
 
-            lower_quantile = 2
-            upper_quantile = 98
-            pixel_size = 110
+            lower_quantile = 1.5
+            upper_quantile = 98.5
 
         else:
             score_thresholds = {0:single_threshold, 1:mating_threshold, 2:budding_threshold}
