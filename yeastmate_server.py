@@ -28,8 +28,8 @@ if __name__ == '__main__':
     argparser.add_argument('--gpu', action='store_true')
     argparser.add_argument('--gpu_index', type=int, default=0)
     argparser.add_argument('--port', type=int, default=11005)
-    argparser.add_argument('--config', type=str, default=os.path.join(os.path.split(__file__)[0], 'yeastmate-artifacts/yeastmate.yaml'))
-    argparser.add_argument('--model', type=str, default=os.path.join(os.path.split(__file__)[0], 'yeastmate-artifacts/yeastmate_weights.pth'))
+    argparser.add_argument('--config', type=str, default=os.path.join(os.path.split(__file__)[0], 'models/yeastmate.yaml'))
+    argparser.add_argument('--model', type=str, default=os.path.join(os.path.split(__file__)[0], 'models/yeastmate_weights.pth'))
 
     args = argparser.parse_args()
 
