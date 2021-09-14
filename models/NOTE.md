@@ -1,0 +1,1 @@
+Please put YeastMate configs and saved model weights here.

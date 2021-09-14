@@ -7,7 +7,7 @@ from PIL import Image
 
 from skimage.io import imsave
 
-from skimage.transform import rescale
+from skimage.transform import rescale, resize
 from skimage.exposure import rescale_intensity
 from skimage.color import rgb2gray
 
@@ -24,14 +24,10 @@ def rescale_image(image, pixel_size, ref_pixel_size=110):
 
     return image
 
-def unscale_mask(image, pixel_size, ref_pixel_size=110):
-    scale_factor = get_scale_factor(pixel_size, ref_pixel_size)
-    scale_factor = 1/scale_factor
+def unscale_mask(mask, original_shape):
+    mask = resize(mask, original_shape, preserve_range=True, anti_aliasing=False, order=0)
 
-    if scale_factor != 1.0:
-        image = rescale(image, scale_factor, preserve_range=True, anti_aliasing=False, order=0)
-
-    return image
+    return mask
 
 def unscale_things(things, pixel_size, ref_pixel_size=110):
     scale_factor = get_scale_factor(pixel_size, ref_pixel_size)
@@ -86,9 +82,9 @@ def get_detection_frame(image, zstack, zslice, multichannel, graychannel, video,
 
     return frame, framedict
 
-def unscale_results(detections, mask, pixel_size, ref_pixel_size):
+def unscale_results(detections, mask, original_shape, pixel_size, ref_pixel_size):
     detections = unscale_things(detections, pixel_size, ref_pixel_size)
-    mask = unscale_mask(mask, pixel_size, ref_pixel_size=ref_pixel_size)
+    mask = unscale_mask(mask, original_shape)
 
     return detections, mask
 

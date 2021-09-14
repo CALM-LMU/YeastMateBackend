@@ -1,10 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import get_package_paths
-from PyInstaller.utils.hooks import collect_dynamic_libs
-from pathlib import Path
 from ctypes.util import find_library
+from pathlib import Path
 
+import os
 import sys
+from glob import glob
+
 sys.modules["FixTk"] = None
 
 block_cipher = None
@@ -39,7 +41,7 @@ huey = Analysis(['hueyserver.py'],
              hookspath=[],
              hooksconfig={},
              runtime_hooks=[],
-             excludes=[],
+             excludes=['cv2'],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher,
@@ -50,14 +52,13 @@ server = Analysis(['yeastmate_server.py'],
              binaries=[(find_library('uv'), '.')] if find_library('uv') is not None else [],
              datas=[
                  ('./yeastmate-artifacts', 'yeastmate-artifacts'),
-                 # TODO: do this more cleanly via hook?
-                 (get_package_paths('torchvision')[1],"torchvision"),
+                 (get_package_paths('cv2')[1],"cv2")
              ],
              hiddenimports=[],
              hookspath=['hooks'],
              hooksconfig={},
              runtime_hooks=[],
-             excludes=['matplotlib', 'caffe2', 'cv2'],
+             excludes=['matplotlib', 'caffe2'],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher,
@@ -119,12 +120,16 @@ huey_coll = COLLECT(huey_exe,
                upx_exclude=[],
                name='hueyserver')
 
-# NB: we exclude torch dynamic libraries, as another copy will be put in the torch folder
-# otherwise, the detection server fails to start with some C++ error
-# https://stackoverflow.com/a/56853037
-# excluded_binaries = ['libtorch_cpu.dylib']
-excluded_binaries = [Path(lib[0]).name for lib in collect_dynamic_libs('torch')]
-server.binaries = TOC([x for x in server.binaries if x[0] not in excluded_binaries])
+MISSING_DYLIBS = []
+
+dll = glob(os.path.join(os.environ['CONDA_PREFIX'], 'Library/bin/*.dll'))
+
+for lib in dll:
+    MISSING_DYLIBS.append(Path(lib))
+
+server.binaries += TOC([
+    (lib.name, str(lib.resolve()), 'BINARY') for lib in MISSING_DYLIBS
+])
 
 server_pyz = PYZ(server.pure, server.zipped_data,
              cipher=block_cipher)

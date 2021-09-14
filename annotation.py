@@ -1,351 +1,376 @@
-#########################
-# Imports
-#########################
-
 import os
 import re
 import json
-import napari
 import argparse
 import numpy as np
 from glob import glob
-from skimage.io import imread, imsave
+
+import napari
 from napari.viewer import Viewer
+
+from PyQt5.QtWidgets import QMessageBox
+
+from skimage.io import imread, imsave
 from skimage.measure import regionprops
 
-#########################
-# Hotkeys
-#########################
+class YeastMateAnnotator:
+    def __init__(self, path):
+        self.imglist = self.get_imglist(path)
 
-def set_hotkeys():
-    @Viewer.bind_key('Enter', overwrite=True)
-    def nxtimg(viewer):
-        """Next image."""
-        next_image()
+        self.namelist = ['mating', 'budding']
+        self.colorlist = ['magenta', 'yellow']
 
-def get_imglist(path):
-    imglist = glob(os.path.join(path, '*.tif')) + glob(os.path.join(path, '*.tiff'))
-    imglist = [x for x in imglist if not 'mask' in x]
-    imglist = sorted(imglist, key=lambda f: [int(n) for n in re.findall(r"\d+", f)])
+        self.counter = 0
+        self.loaded = False
+        self.changed = False
+
+        self.viewer = napari.Viewer()
         
-    return imglist
+        self.set_hotkeys()
+        self.next_image(0)
 
+    def save_messagebox(self):
+        msg = QMessageBox()
 
-def next_image(btn=None):
-    global loaded
-    global counter
-    global imglist
+        msg.setIcon(QMessageBox.Question)
+        msg.setWindowTitle("Unsaved changes!")
+        msg.setText("Do you want to save your changes?")
 
-    if counter < len(imglist):
-        if loaded:
-            save_labels()
-            counter += 1
-        
-        # Reset Napari view
-        viewer.layers.select_all()
-        viewer.layers.remove_selected()
-        viewer.reset_view()
+        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
 
-    if counter < len(imglist):
-        # Load next image
-        label_image()
-        loaded = True
+        reply = msg.exec_()
 
-def save_labels():
-    global counter
-    global imglist
-    global namelist
+        if reply == 4194304:
+            return 'cancel'
+        elif reply == 16384:
+            return 'yes'
+        elif reply == 65536:
+            return 'no'
+        else:
+            raise ValueError
+    
+    def set_hotkeys(self):
+        @Viewer.bind_key('Enter', overwrite=True)
+        def forward(viewer):
+            self.next_image(1)
 
-    mask = viewer.layers['single cell'].data
+        @Viewer.bind_key('Left', overwrite=True)
+        def backward(viewer):
+            self.next_image(-1)
 
-    things = {}
+        @Viewer.bind_key('s', overwrite=True)
+        def save(viewer):
+            self.save_labels()
 
-    # Add single objects to results:
-    single_objects = regionprops(mask)
+    @staticmethod
+    def get_imglist(path):
+        imglist = glob(os.path.join(path, '*.tif')) + glob(os.path.join(path, '*.tiff'))
+        imglist = [x for x in imglist if not 'mask' in x]
+        imglist = sorted(imglist, key=lambda f: [int(n) for n in re.findall(r"\d+", f)])
+            
+        return imglist
 
-    rp_dict = {}
-    for rp in single_objects:
-        rp_dict[rp.label] = rp
+    def catch_data_change(self, event):
+        self.changed = True
 
-    for obj in single_objects:
-        bbox = [obj.bbox[1],obj.bbox[0],obj.bbox[3],obj.bbox[2]]
-        bbox = [int(x) for x in bbox]
+    def next_image(self, direction, btn=None):
+        if self.counter < len(self.imglist):
+            if self.loaded:
+                if self.changed:
+                    reply = self.save_messagebox()
 
-        things[str(obj.label)] = {'id': obj.label, 'box':bbox, 'class': [str(0)], 'score': [1.0], 'links': []}
+                    if reply == 'cancel':
+                        return
+                    elif reply == 'yes':
+                        self.save_labels()
 
-    maxcounter = max(list(rp_dict.keys())) + 2
+                self.counter = (self.counter + direction) % len(self.imglist)
+            
+            # Reset Napari view
+            # NB: we manually do that in label_image due to bug in napari 0.4.11
+            # self.viewer.layers.select_all()
+            # self.viewer.layers.remove_selected()
+            # self.viewer.reset_view()
 
-    # Add linked classes to results
-    for class_idx, name in enumerate(namelist):
+        if self.counter < len(self.imglist):
+            # Load next image
+            self.label_image()
 
-        data = viewer.layers[name].data
+            self.loaded = True
+            self.changed = False
 
-        for sample in data:
-            new_mask = np.zeros_like(mask, np.uint8)
-            samplelist = [list(x) for x in list(sample)]
+            for layer in self.viewer.layers:
+                layer.events.data.connect(self.catch_data_change)
 
-            # Get ID of main class
-            main_ids = maxcounter
-            maxcounter += 1
+    def save_labels(self):
+        mask = self.viewer.layers['single cell'].data
 
-            # Collect subobjects
-            subobject_ids = []
-            for n,point in enumerate(samplelist):
-                sub_ids = mask[int(point[0]), int(point[1])]
+        if mask.max() == 0:
+            return
 
-                # This is hardcoded for our yeast subclassification system
-                if class_idx == 0:
-                    if n < 2:
-                        subclass_idx = 1
-                    else:
-                        subclass_idx = 2
-                else:
-                    if n == 0:
-                        subclass_idx = 1
-                    else:
-                        subclass_idx = 2
+        things = {}
 
-                fullclass_idx = "{}.{}".format(class_idx+1, subclass_idx)
+        # Add single objects to results:
+        single_objects = regionprops(mask)
 
-                try:
-                    things[str(sub_ids)]['class'].append(fullclass_idx)
-                    things[str(sub_ids)]['score'].append(1.0)
-                    things[str(sub_ids)]['links'].append(str(main_ids))
-                except KeyError:
-                    raise KeyError('All points must be within a masked object!')
+        rp_dict = {}
+        for rp in single_objects:
+            rp_dict[rp.label] = rp
 
-                subobject_ids.append(str(sub_ids))
-
-                new_mask[mask==sub_ids] = 1
-
-            # Add main classes without bbox
-            obj = regionprops(new_mask)[0]
-
+        for obj in single_objects:
             bbox = [obj.bbox[1],obj.bbox[0],obj.bbox[3],obj.bbox[2]]
             bbox = [int(x) for x in bbox]
 
-            things[str(main_ids)] = {'id': str(main_ids), 'box': bbox, 'class': [str(class_idx+1)], 'score': [1.0], 'links': subobject_ids}
+            things[str(obj.label)] = {'id': obj.label, 'box':bbox, 'class': [str(0)], 'score': [1.0], 'links': []}
 
-    # Generate results dictionary
-    imagename = os.path.basename(imglist[counter])
-    
-    metadata = {}
-    metadata['height'] = mask.shape[0]
-    metadata['width'] = mask.shape[1]
-    metadata['source'] = 'Annotation'
-    metadata['detection_frame'] = None
-    metadata['box_format'] = 'x1y1x2y2'
+        maxcounter = max(list(rp_dict.keys())) + 2
 
-    res = {'image':imagename, 'metadata':metadata, 'detections':things}
+        # Add linked classes to results
+        for class_idx, name in enumerate(self.namelist):
 
-    # Save results
-    if imglist[counter].endswith('tiff'):
-        imsave(imglist[counter].replace('.tiff', '_mask.tiff'), mask)
+            data = self.viewer.layers[name].data
 
-        with open(imglist[counter].replace('.tiff', '_detections.json'), 'w') as file:
-            json.dump(res, file, indent=1)
-    
-    else:
-        imsave(imglist[counter].replace('.tif', '_mask.tif'), mask)
+            for sample in data:
+                new_mask = np.zeros_like(mask, np.uint8)
+                samplelist = [list(x) for x in list(sample)]
 
-        with open(imglist[counter].replace('.tif', '_detections.json'), 'w') as file:
-            json.dump(res, file, indent=1)   
+                # Get ID of main class
+                main_ids = maxcounter
+                maxcounter += 1
 
-def get_imported_layers(dic, mask, score_thresholds):
+                # Collect subobjects
+                subobject_ids = []
+                for n,point in enumerate(samplelist):
+                    sub_ids = mask[int(point[0]), int(point[1])]
 
-    # Initialize dictionaries
-    layers = {}
-    rp_dict = {}
+                    # This is hardcoded for our yeast subclassification system
+                    if class_idx == 0:
+                        if n < 2:
+                            subclass_idx = 1
+                        else:
+                            subclass_idx = 2
+                    else:
+                        if n == 0:
+                            subclass_idx = 1
+                        else:
+                            subclass_idx = 2
 
-    # Get all mask objects and convert them to a dictionary with their ID keys.
-    rp_objs = regionprops(mask)
-
-    for rp in rp_objs:
-        rp_dict[rp.label] = rp
-
-    for key, thing in dic['detections'].items():
-
-        # Split class string into main and subclass (and account for .0 edge case).
-        try:
-            subclass_idx = int(thing['class'][0].split('.')[1])
-
-            if subclass_idx > 0: continue
-
-            class_idx = int(thing['class'][0].split('.')[0])
-
-        except IndexError:
-            class_idx = int(thing['class'][0].split('.')[0])
-
-        # No extra annotation layer for single cell (besides mask).
-        if class_idx == 0: continue
-
-        # Skip objects with score < threshold.
-        if score_thresholds is not None:
-            if thing['score'][0] < score_thresholds[str(class_idx)]: continue
-        
-        # Add class layers
-        class_counter = class_idx
-        while True:
-            try:
-                _ = layers[class_idx]
-                break
-            except KeyError:
-                layers[class_idx] = []
-
-                while True:
-                    class_counter -= 1
-
-                    if class_counter == 0: break
+                    fullclass_idx = "{}.{}".format(class_idx+1, subclass_idx)
 
                     try:
-                        _ = layers[class_counter]
+                        things[str(sub_ids)]['class'].append(fullclass_idx)
+                        things[str(sub_ids)]['score'].append(1.0)
+                        things[str(sub_ids)]['links'].append(str(main_ids))
                     except KeyError:
-                        layers[class_counter] = []
+                        raise KeyError('All points must be within a masked object!')
 
+                    subobject_ids.append(str(sub_ids))
 
-        # Add linked objects to their layer.
-        links = []
-        for n,link in enumerate(thing['links']):
-            obj = dic['detections'][link]
+                    new_mask[mask==sub_ids] = 1
 
-            for m, uplink in enumerate(obj['links']):
-                if uplink == key:
-                    subclass_idx = int(obj['class'][m+1].split('.')[1])
+                # Add main classes without bbox
+                obj = regionprops(new_mask)[0]
 
-            # Add array for each subclass
+                bbox = [obj.bbox[1],obj.bbox[0],obj.bbox[3],obj.bbox[2]]
+                bbox = [int(x) for x in bbox]
+
+                things[str(main_ids)] = {'id': str(main_ids), 'box': bbox, 'class': [str(class_idx+1)], 'score': [1.0], 'links': subobject_ids}
+
+        # Generate results dictionary
+        imagename = os.path.basename(self.imglist[self.counter])
+        
+        metadata = {}
+        metadata['height'] = mask.shape[0]
+        metadata['width'] = mask.shape[1]
+        metadata['source'] = 'Annotation'
+        metadata['detection_frame'] = None
+        metadata['box_format'] = 'x1y1x2y2'
+
+        res = {'image':imagename, 'metadata':metadata, 'detections':things}
+
+        # Save results
+        if self.imglist[self.counter].endswith('tiff'):
+            imsave(self.imglist[self.counter].replace('.tiff', '_mask.tiff'), mask)
+
+            with open(self.imglist[self.counter].replace('.tiff', '_detections.json'), 'w') as file:
+                json.dump(res, file, indent=1)
+        
+        else:
+            imsave(self.imglist[self.counter].replace('.tif', '_mask.tif'), mask)
+
+            with open(self.imglist[self.counter].replace('.tif', '_detections.json'), 'w') as file:
+                json.dump(res, file, indent=1)   
+
+        self.changed = False
+
+    def get_imported_layers(self, dic, mask):
+
+        # Initialize dictionaries
+        layers = {}
+        rp_dict = {}
+
+        # Get all mask objects and convert them to a dictionary with their ID keys.
+        rp_objs = regionprops(mask)
+
+        for rp in rp_objs:
+            rp_dict[rp.label] = rp
+
+        for key, thing in dic['detections'].items():
+
+            # Split class string into main and subclass (and account for .0 edge case).
+            try:
+                subclass_idx = int(thing['class'][0].split('.')[1])
+
+                if subclass_idx > 0: continue
+
+                class_idx = int(thing['class'][0].split('.')[0])
+
+            except IndexError:
+                class_idx = int(thing['class'][0].split('.')[0])
+
+            # No extra annotation layer for single cell (besides mask).
+            if class_idx == 0: continue
+            
+            # Add class layers
+            class_counter = class_idx
             while True:
                 try:
-                    _ = links[subclass_idx - 1]
+                    _ = layers[class_idx]
                     break
-                except IndexError:
-                    links.append([])
+                except KeyError:
+                    layers[class_idx] = []
 
-            # Get an object coordinate for path of points.
-            coords = rp_dict[int(link)].coords
-            point = coords[len(coords)//2]
+                    while True:
+                        class_counter -= 1
 
-            links[subclass_idx - 1].append(point)
+                        if class_counter == 0: break
 
-        # Collapse sublists and add them to their respective layer.
-        collapsed = [item for sublist in links for item in sublist]
-        layers[class_idx].append(collapsed)
+                        try:
+                            _ = layers[class_counter]
+                        except KeyError:
+                            layers[class_counter] = []
 
-    return layers
 
-def get_new_layers():
-    # Default 2 (mating, budding) layers
-    layers = {1: [], 2:[]}
+            # Add linked objects to their layer.
+            links = []
+            for n,link in enumerate(thing['links']):
+                obj = dic['detections'][link]
 
-    return layers
-        
-def label_image():  
-    global viewer
-    global counter
-    global imglist
-    global namelist
-    global score_thresholds
+                for m, uplink in enumerate(obj['links']):
+                    if uplink == key:
+                        subclass_idx = int(obj['class'][m+1].split('.')[1])
 
-    # Load image and if existing, mask and detections.json
-    image = imread(imglist[counter])
-        
-    try:
-        if imglist[counter].endswith('tiff'):
-            try:
-                mask = imread(imglist[counter].replace('.tiff', '_mask.tiff'))
-            except:
-                mask = imread(imglist[counter].replace('.tiff', '_mask.tif'))
+                # Add array for each subclass
+                while True:
+                    try:
+                        _ = links[subclass_idx - 1]
+                        break
+                    except IndexError:
+                        links.append([])
 
-        else:
-            try:
-                mask = imread(imglist[counter].replace('.tif', '_mask.tif'))
-            except:
-                mask = imread(imglist[counter].replace('.tif', '_mask.tiff'))
+                # Get an object coordinate for path of points.
+                coords = rp_dict[int(link)].coords
+                point = coords[len(coords)//2]
 
-        mask = mask.astype(np.uint16)
-        imported_mask = True
+                links[subclass_idx - 1].append(point)
 
-    except:
-        mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint16)
-        imported_mask = False
-        print('no mask found')
-    
-    if imported_mask:
-        try:
-            if imglist[counter].endswith('tiff'):
-               fileend = '.tiff'
-            else:
-                fileend = '.tif'
-                
-            with open(imglist[counter].replace(fileend, '_detections.json'), 'r') as file:
-                dic = json.load(file)
+            # Collapse sublists and add them to their respective layer.
+            collapsed = [item for sublist in links for item in sublist]
+            layers[class_idx].append(collapsed)
 
-            # Convert objects in detections.json to Napari layers
-            layers = get_imported_layers(dic, mask, score_thresholds)  
-        except:
-            # Convert settings from GUI to Napari layers
-            layers = get_new_layers()
-            print('no json file found!')
-    else:
-        print('thus skipping loading json annotations')
-        layers = get_new_layers()
+        return layers
 
-    # Add Napari layers to viewer  
+    @staticmethod
+    def get_new_layers():
+        # Default 2 (mating, budding) layers
+        layers = {1: [], 2:[]}
 
-    viewer.add_image(image)    
-    viewer.add_labels(mask[:,:], opacity=0.3, name='single cell', visible=True)
-        
-    for n in range(len(list(layers.keys()))):
-        things = layers[n+1]
-
-        if not things:
-            things = None
-
-        try:
-            name = namelist[n]
-        except IndexError:
-            name = 'Class {}'.format(n+1)
-
-        viewer.add_shapes(things, shape_type='path', edge_width=5, opacity=0.5, edge_color='red', face_color='red', name=name, visible=True)
+        return layers
             
-    viewer.layers.selection.active = viewer.layers[-1]
-    
+    def label_image(self): 
+        # Load image and if existing, mask and detections.json
+        image = imread(self.imglist[self.counter])
+            
+        try:
+            if self.imglist[self.counter].endswith('tiff'):
+                try:
+                    mask = imread(self.imglist[self.counter].replace('.tiff', '_mask.tiff'))
+                except:
+                    mask = imread(self.imglist[self.counter].replace('.tiff', '_mask.tif'))
+
+            else:
+                try:
+                    mask = imread(self.imglist[self.counter].replace('.tif', '_mask.tif'))
+                except:
+                    mask = imread(self.imglist[self.counter].replace('.tif', '_mask.tiff'))
+
+            mask = mask.astype(np.uint16)
+            imported_mask = True
+
+        except:
+            mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint16)
+            imported_mask = False
+            print('no mask found')
+        
+        if imported_mask:
+            try:
+                if self.imglist[self.counter].endswith('tiff'):
+                    fileend = '.tiff'
+                else:
+                    fileend = '.tif'
+                    
+                with open(self.imglist[self.counter].replace(fileend, '_detections.json'), 'r') as file:
+                    dic = json.load(file)
+
+                # Convert objects in detections.json to Napari layers
+                layers = self.get_imported_layers(dic, mask)  
+            except:
+                # Convert settings from GUI to Napari layers
+                layers = self.get_new_layers()
+                print('no json file found!')
+        else:
+            print('thus skipping loading json annotations')
+            layers = self.get_new_layers()
+
+        # Add Napari layers to viewer  
+
+        # NB: napari 0.4.11 seems to crash if we remove the label layer and then add a new one
+        # therefore, we add new layers first and then remove the old ones
+        old_layers = list(self.viewer.layers)
+
+        self.viewer.add_image(image)    
+        self.viewer.add_labels(mask[:,:], opacity=0.3, name='single cell', visible=True)
+            
+        for n in range(len(list(layers.keys()))):
+            things = layers[n+1]
+
+            if not things:
+                things = None
+
+            try:
+                name = self.namelist[n]
+            except IndexError:
+                name = 'Class {}'.format(n+1)
+
+            self.viewer.add_shapes(things, shape_type='path', edge_width=5, opacity=0.5, edge_color=self.colorlist[n], face_color=self.colorlist[n], name=name, visible=True)
+        
+        # remove old layers
+        for layer in old_layers:
+            self.viewer.layers.remove(layer)
+        
+        # new layers will have received a "name [1]" label because old ones with the same name were still there
+        # remove that
+        for layer in self.viewer.layers:
+            layer.name = layer.name.replace(' [1]', '')
+
+        self.viewer.layers.selection.active = self.viewer.layers[-1]
+
 
 if __name__ == '__main__':
     # Parse arguments from Electron frontend.
     parser = argparse.ArgumentParser()
     parser.add_argument('path', type=str, help='The path to the images you want to label.')
-    parser.add_argument('score_thresholds', nargs='?', default="", type=str, help='Score thresholds for the different classes.')
     args = parser.parse_args()
 
-    path = args.path
-    score_thresholds_string = args.score_thresholds
-
-    # Set default classes.
-    namelist = ['mating', 'budding']
-
-    # Convert score thresholds from string to dictionary of floats.
-    if score_thresholds_string:
-        score_thresholds = {}
-        score_classes = score_thresholds_string.split('C')
-
-        for class_threshold in score_classes:
-            key, value = class_threshold.split('S')
-
-            score_thresholds[key] = float(value)
-    else:
-        score_thresholds = None
-
-    # Get all tif files in folder.
-    imglist = get_imglist(path)
-    
-    # Initialize global variables
-    counter = 0
-    loaded = False
-
-    # Start napari viewer
-    style = {'description_width': 'initial'}
-
-    viewer = napari.Viewer()
-    set_hotkeys()
-    next_image()
+    annotator = YeastMateAnnotator(args.path)
     napari.run()
