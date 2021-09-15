@@ -93,7 +93,7 @@ def queue_job():
         else:
             score_thresholds = {0:single_threshold, 1:mating_threshold, 2:budding_threshold}
 
-        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size)
+        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port)
 
     if 'export' in request.json.keys():
         classes = request.json['export']['classes']

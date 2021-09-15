@@ -88,7 +88,7 @@ def unscale_results(detections, mask, original_shape, pixel_size, ref_pixel_size
 
     return detections, mask
 
-def detect_one_image(image, score_thresholds, ip):    
+def detect_one_image(image, score_thresholds, ip, port):    
     image = image.astype(np.float32)
     image = Image.fromarray(image, mode='F')
     
@@ -102,7 +102,7 @@ def detect_one_image(image, score_thresholds, ip):
                     "annotations": ('score_thresholds.json', score_bytes)
                 }
 
-    result = requests.post("http://{}/predict".format(ip), files=filedict).json()
+    result = requests.post("http://{}:{}/predict".format(ip, port), files=filedict).json()
 
     detections = result['detections']
    

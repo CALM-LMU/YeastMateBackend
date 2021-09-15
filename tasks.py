@@ -52,7 +52,7 @@ def preprocessing_task(path, alignment, channels, video_split):
 
 
 @huey.task()
-def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, video, frame_selection, ip, ref_pixel_size):
+def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port):
     if os.path.isdir(os.path.join(path, 'yeastmate')):
         in_dir = os.path.join(path, 'yeastmate')
     else:
@@ -73,7 +73,7 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, gr
         image = preprocess_image(image, lower_quantile, upper_quantile, pixel_size, ref_pixel_size)
         
         try:
-            detections, mask = detect_one_image(image, score_thresholds, ip)
+            detections, mask = detect_one_image(image, score_thresholds, ip, port)
         except:
             print('Image corrupted/unfit for detection, skipping image!')
             continue
