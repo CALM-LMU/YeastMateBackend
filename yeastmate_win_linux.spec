@@ -51,7 +51,7 @@ server = Analysis(['yeastmate_server.py'],
              pathex=[],
              binaries=[(find_library('uv'), '.')] if find_library('uv') is not None else [],
              datas=[
-                 ('./yeastmate-artifacts', 'yeastmate-artifacts'),
+                 ('./models', 'models'),
                  (get_package_paths('cv2')[1],"cv2")
              ],
              hiddenimports=[],
