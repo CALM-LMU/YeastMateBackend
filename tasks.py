@@ -30,7 +30,7 @@ def preprocessing_task(path, alignment, channels, video_split):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
 
     in_dir = path
-    out_dir = os.path.join(in_dir, 'yeastmate')
+    out_dir = os.path.join(in_dir, 'yeastmate-preprocessed')
     
     files_to_process = glob(os.path.join(in_dir, "*"))
     files_to_process = [path for path in files_to_process if os.path.isfile(path)]
@@ -53,8 +53,8 @@ def preprocessing_task(path, alignment, channels, video_split):
 
 @huey.task()
 def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port):
-    if os.path.isdir(os.path.join(path, 'yeastmate')):
-        in_dir = os.path.join(path, 'yeastmate')
+    if os.path.isdir(os.path.join(path, 'yeastmate-preprocessed')):
+        in_dir = os.path.join(path, 'yeastmate-preprocessed')
     else:
         in_dir = path
 
@@ -106,8 +106,8 @@ def export_task(path, classes, box_expansion, boxsize, boxscale_switch, boxscale
     if len(crop_classes) == 0:
         return
 
-    if os.path.isdir(os.path.join(path, 'yeastmate')):
-        in_dir = os.path.join(path, 'yeastmate')
+    if os.path.isdir(os.path.join(path, 'yeastmate-preprocessed')):
+        in_dir = os.path.join(path, 'yeastmate-preprocessed')
     else:
         in_dir = path
 
