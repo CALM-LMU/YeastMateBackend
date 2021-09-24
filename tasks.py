@@ -21,12 +21,12 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 @huey.task()
-def start_pipeline():
+def start_pipeline(path, alignment, detection, export):
     return
 
 
 @huey.task()
-def preprocessing_task(path, alignment, channels, video_split):
+def preprocessing_task(path, detection, export, alignment, channels, video_split):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
 
     in_dir = path
@@ -52,7 +52,7 @@ def preprocessing_task(path, alignment, channels, video_split):
 
 
 @huey.task()
-def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port):
+def detect_task(path, export, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port):
     if os.path.isdir(os.path.join(path, 'yeastmate')):
         in_dir = os.path.join(path, 'yeastmate')
     else:
