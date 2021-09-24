@@ -30,4 +30,4 @@ dependencies:
     # - torchvision==0.10.0+cu102 -f https://download.pytorch.org/whl/torch_stable.html
     # - torchaudio===0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
     - git+https://github.com/facebookresearch/detectron2.git@v0.5
-    - git+https://github.com/CALM-LMU/YeastMateDetector.git@detectron-update
+    - git+https://github.com/hoerlteam/YeastMate.git
