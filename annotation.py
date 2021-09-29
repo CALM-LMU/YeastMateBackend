@@ -190,7 +190,7 @@ class YeastMateAnnotator:
 
         # Save results
         if self.imglist[self.counter].endswith('tiff'):
-            imsave(self.imglist[self.counter].replace('.tiff', '_mask.tiff'), mask)
+            imsave(self.imglist[self.counter].replace('.tiff', '_mask.tif'), mask)
 
             with open(self.imglist[self.counter].replace('.tiff', '_detections.json'), 'w') as file:
                 json.dump(res, file, indent=1)
@@ -293,16 +293,10 @@ class YeastMateAnnotator:
             
         try:
             if self.imglist[self.counter].endswith('tiff'):
-                try:
-                    mask = imread(self.imglist[self.counter].replace('.tiff', '_mask.tiff'))
-                except:
-                    mask = imread(self.imglist[self.counter].replace('.tiff', '_mask.tif'))
+                mask = imread(self.imglist[self.counter].replace('.tiff', '_mask.tif'))
 
             else:
-                try:
-                    mask = imread(self.imglist[self.counter].replace('.tif', '_mask.tif'))
-                except:
-                    mask = imread(self.imglist[self.counter].replace('.tif', '_mask.tiff'))
+                mask = imread(self.imglist[self.counter].replace('.tif', '_mask.tif'))
 
             mask = mask.astype(np.uint16)
             imported_mask = True
