@@ -108,12 +108,13 @@ def queue_job():
 
     if 'export' in request.json.keys():
         classes = request.json['export']['classes']
+        keep_id = request.json['export']['keepID']
         boxsize = int(request.json['export']['boxSize'])
         box_expansion = request.json['export']['boxExpansion']
         boxscale = float(request.json['export']['boxScale'])
         boxscale_switch = request.json['export']['boxScaleSwitch']
 
-        pipeline = pipeline.then(export_task, path, classes, box_expansion, boxsize, boxscale_switch, boxscale)
+        pipeline = pipeline.then(export_task, path, classes, keep_id, box_expansion, boxsize, boxscale_switch, boxscale)
 
     huey.enqueue(pipeline)
 
