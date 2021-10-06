@@ -1,0 +1,15 @@
+waitress
+flask
+flask_cors
+scikit-image
+scipy
+numpy
+opencv-python
+huey
+napari
+PyQt5
+pims
+jpype1
+pillow
+git+https://github.com/facebookresearch/detectron2.git@v0.5
+git+https://github.com/hoerlteam/YeastMate.git
