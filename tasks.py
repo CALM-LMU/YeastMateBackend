@@ -21,12 +21,12 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 @huey.task()
-def start_pipeline():
+def start_pipeline(path, alignment, detection, export):
     return
 
 
 @huey.task()
-def preprocessing_task(path, alignment, channels, video_split):
+def preprocessing_task(path, detection, export, alignment, channels, video_split):
     alignment_channel_cam1, alignment_channel_cam2, channels_cam1, channels_cam2, remove_channels = get_align_channel_vars(channels)
 
     in_dir = path
@@ -52,7 +52,7 @@ def preprocessing_task(path, alignment, channels, video_split):
 
 
 @huey.task()
-def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port):
+def detect_task(path, export, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port):
     if os.path.isdir(os.path.join(path, 'yeastmate-preprocessed')):
         in_dir = os.path.join(path, 'yeastmate-preprocessed')
     else:
@@ -89,17 +89,17 @@ def detect_task(path, include_tag, exclude_tag, zstack, zslice, multichannel, gr
         resdict['metadata']['bbox_format'] = 'x1y1x2y2'
 
         if path.endswith('tiff'):
-            tifimsave(path.replace('.tiff', '_mask.tiff'), mask)
+            tifimsave(path.replace('.tiff', '_mask.tif'), mask.astype(np.uint16), imagej=True)
             with open(path.replace('.tiff', '_detections.json'), 'w') as file:
                 doc = json.dump(resdict, file, indent=1)
         else:
-            tifimsave(path.replace('.tif', '_mask.tif'), mask)
+            tifimsave(path.replace('.tif', '_mask.tif'), mask.astype(np.uint16), imagej=True)
             with open(path.replace('.tif', '_detections.json'), 'w') as file:
                 doc = json.dump(resdict, file, indent=1)
                 
 
 @huey.task()
-def export_task(path, classes, box_expansion, boxsize, boxscale_switch, boxscale):
+def export_task(path, classes, keep_id, box_expansion, boxsize, boxscale_switch, boxscale):
     
     crop_classes, tags = parse_export_classes(classes)
 
@@ -111,7 +111,7 @@ def export_task(path, classes, box_expansion, boxsize, boxscale_switch, boxscale
     else:
         in_dir = path
 
-    files_to_process = glob(os.path.join(in_dir, "*_mask.tif")) + glob(os.path.join(in_dir, "*_mask.tiff"))
+    files_to_process = glob(os.path.join(in_dir, "*_mask.tif"))
 
     out_dir = os.path.join(in_dir, 'crops')
     if not os.path.exists(out_dir):
@@ -120,55 +120,32 @@ def export_task(path, classes, box_expansion, boxsize, boxscale_switch, boxscale
     for filepath in files_to_process:
         try:
             if len(crop_classes) > 0:
-                if path.endswith('tiff'):
-                    tiffmask = True
-                    try:
-                        image = tifimread(filepath.replace('_mask.tiff', '.tiff'))
-                        tiffimg = True
-                    except:
-                        image = tifimread(filepath.replace('_mask.tiff', '.tif'))
-                        tiffimg = False
-                else:
-                    tiffmask = False
-                    try:
-                        image = tifimread(filepath.replace('_mask.tif', '.tif'))
-                        tiffimg = False
-                    except:
-                        image = tifimread(filepath.replace('_mask.tif', '.tiff'))
-                        tiffimg = True
+                try:
+                    image = tifimread(filepath.replace('_mask.tif', '.tif'))
+                    tiffimg = False
+                except:
+                    image = tifimread(filepath.replace('_mask.tif', '.tiff'))
+                    tiffimg = True
 
             mask = tifimread(filepath)
   
-            if path.endswith('tiff'):
-                with open(filepath.replace('_mask.tiff', '_detections.json')) as file:
-                    dic = json.load(file)
-            else:
-                with open(filepath.replace('_mask.tif', '_detections.json')) as file:
-                    dic = json.load(file)
+            with open(filepath.replace('_mask.tif', '_detections.json')) as file:
+                dic = json.load(file)
             
         except:
             print('Input file corrupted!')
             continue
 
-        filename = os.path.basename(filepath)
+        filename = os.path.basename(filepath).replace('_mask', '')
 
         for key,thing in dic['detections'].items():
-            try:
-                subclass_idx = int(thing['class'][0].split('.')[1])
-
-                if subclass_idx > 0: continue
-
-                class_idx = int(thing['class'][0].split('.')[0])
-
-            except IndexError:
-                class_idx = int(thing['class'][0].split('.')[0])
+            
+            class_idx = int(thing['class'][0])
 
             if class_idx == 0: continue
 
-            box = thing['box']
-
-            cls_indices = get_class_indices(key, dic['detections'])
+            link_dict = get_link_dict(dic['detections'], key, keep_id)
 
             if class_idx in crop_classes:
-                crop_img(image, box, out_dir, filename, tags[class_idx], thing['id'], cls_indices, dic['metadata'], box_expansion, boxsize, boxscale_switch, boxscale, mask=False, tiff=tiffimg)
-                crop_img(mask, box, out_dir, filename, tags[class_idx], thing['id'], cls_indices, dic['metadata'], box_expansion, boxsize, boxscale_switch, boxscale, mask=True, tiff=tiffmask)
+                crop_img(image, thing['box'], out_dir, filename, tags[class_idx], thing['id'], link_dict, dic['metadata'], box_expansion, boxsize, boxscale_switch, boxscale, mask=False, tiff=tiffimg)
+                crop_img(mask, thing['box'], out_dir, filename, tags[class_idx], thing['id'], link_dict, dic['metadata'], box_expansion, boxsize, boxscale_switch, boxscale, mask=True, tiff=False)

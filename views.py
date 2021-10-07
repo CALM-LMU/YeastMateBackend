@@ -52,15 +52,26 @@ def remove_execute_task(task, task_value, exc):
 @app.route('/submit', methods=['POST'])
 def queue_job():
 
+    alignment  = False
+    detection = False
+    export = False
+
+    if 'preprocessing' in request.json.keys():
+        alignment = True
+    if 'detection' in request.json.keys():
+        detection = True
+    if 'export' in request.json.keys():
+        export = True
+
     path = os.path.join(request.json['path'])
-    pipeline = start_pipeline.s()
+    pipeline = start_pipeline.s(path, alignment, detection, export)
     
     if 'preprocessing' in request.json.keys():
         alignment = request.json['preprocessing']['alignment']
         channels = request.json['preprocessing']['channels'] 
         video_split = request.json['preprocessing']['videoSplit']
 
-        pipeline = pipeline.then(preprocessing_task, path, alignment, channels, video_split)
+        pipeline = pipeline.then(preprocessing_task, path, detection, export, alignment, channels, video_split)
 
     if 'detection' in request.json.keys():      
         include_tag = request.json['includeTag']
@@ -93,16 +104,17 @@ def queue_job():
         else:
             score_thresholds = {0:single_threshold, 1:mating_threshold, 2:budding_threshold}
 
-        pipeline = pipeline.then(detect_task, path, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port)
+        pipeline = pipeline.then(detect_task, path, export, include_tag, exclude_tag, zstack, zslice, multichannel, graychannel, lower_quantile, upper_quantile, score_thresholds, pixel_size, ref_pixel_size, video, frame_selection, ip, port)
 
     if 'export' in request.json.keys():
         classes = request.json['export']['classes']
+        keep_id = request.json['export']['keepID']
         boxsize = int(request.json['export']['boxSize'])
         box_expansion = request.json['export']['boxExpansion']
         boxscale = float(request.json['export']['boxScale'])
         boxscale_switch = request.json['export']['boxScaleSwitch']
 
-        pipeline = pipeline.then(export_task, path, classes, box_expansion, boxsize, boxscale_switch, boxscale)
+        pipeline = pipeline.then(export_task, path, classes, keep_id, box_expansion, boxsize, boxscale_switch, boxscale)
 
     huey.enqueue(pipeline)
 
@@ -122,17 +134,17 @@ def get_tasklist():
     tasks = huey.pending()
     for t in tasks:
         if t.name == 'start_pipeline':
-            if t.args[0]:
-                job = 'Preprocessing'
-                tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
-            
             if t.args[1]:
-                job = 'Detection'
-                tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
+                job = 'Preprocessing'
+                tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
             
             if t.args[2]:
+                job = 'Detection'
+                tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
+            
+            if t.args[3]:
                 job = 'Export'
-                tasklist.append({'Job': job, 'Path': t.args[3], 'Status': 'Pending'})
+                tasklist.append({'Job': job, 'Path': t.args[0], 'Status': 'Pending'})
   
         if t.name == 'preprocessing_task':
             job = 'Preprocessing'

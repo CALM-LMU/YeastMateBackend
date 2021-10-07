@@ -96,12 +96,6 @@ if __name__ == '__main__':
             imsave(maskbytes, mask)
             mask_data = base64.b64encode(maskbytes.getvalue())
 
-            # box is still tuple of np.float32
-            # convert to tuple of standard float so it is JSON-serializeable
-            # TODO: fix upstream
-            for v in things.values():
-                v['box'] = tuple(map(float, v['box']))
-
         # something went wrong on the server side
         # TODO: more fine-grained error handling?
         except Exception as e:
