@@ -64,9 +64,13 @@ class YeastMateAnnotator:
 
     @staticmethod
     def get_imglist(path):
-        imglist = glob(os.path.join(path, '*.tif')) + glob(os.path.join(path, '*.tiff'))
-        imglist = [x for x in imglist if not 'mask' in x]
-        imglist = sorted(imglist, key=lambda f: [int(n) for n in re.findall(r"\d+", f)])
+
+        if os.path.isfile(path):
+            imglist = [path]
+        else:
+            imglist = glob(os.path.join(path, '*.tif')) + glob(os.path.join(path, '*.tiff'))
+            imglist = [x for x in imglist if not 'mask' in x]
+            imglist = sorted(imglist, key=lambda f: [int(n) for n in re.findall(r"\d+", f)])
             
         return imglist
 
