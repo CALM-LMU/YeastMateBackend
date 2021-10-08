@@ -1,4 +1,4 @@
-name: yeastmate-build
+name: yeastmate
 channels:
   - pytorch
   - defaults
@@ -82,7 +82,6 @@ dependencies:
     - dask==2021.9.1
     - debugpy==1.5.0
     - decorator==5.1.0
-    - detectron2==0.5
     - docstring-parser==0.11
     - docutils==0.17.1
     - entrypoints==0.3
@@ -203,5 +202,5 @@ dependencies:
     - werkzeug==2.0.2
     - wrapt==1.13.1
     - yacs==0.1.8
-    - yeastmatedetector==0.11.0
-prefix: /Users/david/anaconda3/envs/yeastmate-build
+    - git+https://github.com/facebookresearch/detectron2.git@v0.5
+    - git+https://github.com/hoerlteam/YeastMate.git
