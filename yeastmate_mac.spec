@@ -49,7 +49,7 @@ server = Analysis(['yeastmate_server.py'],
              pathex=[],
              binaries=[(find_library('uv'), '.')] if find_library('uv') is not None else [],
              datas=[
-                 ('./yeastmate-artifacts', 'yeastmate-artifacts'),
+                 ('./models', 'models'),
                  # TODO: do this more cleanly via hook?
                  (get_package_paths('torchvision')[1],"torchvision"),
              ],
@@ -57,7 +57,7 @@ server = Analysis(['yeastmate_server.py'],
              hookspath=['hooks'],
              hooksconfig={},
              runtime_hooks=[],
-             excludes=['matplotlib', 'caffe2', 'cv2'],
+             excludes=['matplotlib'],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher,
@@ -123,8 +123,8 @@ huey_coll = COLLECT(huey_exe,
 # otherwise, the detection server fails to start with some C++ error
 # https://stackoverflow.com/a/56853037
 # excluded_binaries = ['libtorch_cpu.dylib']
-excluded_binaries = [Path(lib[0]).name for lib in collect_dynamic_libs('torch')]
-server.binaries = TOC([x for x in server.binaries if x[0] not in excluded_binaries])
+# excluded_binaries = [Path(lib[0]).name for lib in collect_dynamic_libs('torch')]
+# server.binaries = TOC([x for x in server.binaries if x[0] not in excluded_binaries])
 
 server_pyz = PYZ(server.pure, server.zipped_data,
              cipher=block_cipher)
