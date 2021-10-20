@@ -60,6 +60,19 @@ def parse_export_classes(array):
 
     return crop_classes, tags
 
+def count_objects(detections):
+    counts = {"cells":0, "matings":0, "buddings":0}
+
+    for val in detections.values():
+        if val['class'][0] == '0':
+            counts['cells'] += 1
+        elif val['class'][0] == '1':
+            counts['matings'] += 1
+        elif val['class'][0] == '2':
+            counts['buddings'] += 1
+
+    return counts
+
 def enlarge_box(box, boxsize, height, width):
     x1, y1, x2, y2 = map(int, box)
     boxsize = boxsize//2

@@ -80,13 +80,15 @@ def detect_task(path, export, include_tag, exclude_tag, zstack, zslice, multicha
 
         detections, mask = unscale_results(detections, mask, original_shape, pixel_size, ref_pixel_size)
 
-        resdict = {'image': os.path.basename(path), 'metadata': {}, 'detections': detections}
+        resdict = {'image': os.path.basename(path), 'counts':{}, 'metadata': {}, 'detections': detections}
                 
         resdict['metadata']['height'] = image.shape[0]
         resdict['metadata']['width'] = image.shape[1]
         resdict['metadata']['detection_frame'] = framedict
         resdict['metadata']['source'] = 'Detection'
         resdict['metadata']['bbox_format'] = 'x1y1x2y2'
+
+        resdict['counts'] = count_objects(detections)
 
         if path.endswith('tiff'):
             tifimsave(path.replace('.tiff', '_mask.tif'), mask.astype(np.uint16), imagej=True)
